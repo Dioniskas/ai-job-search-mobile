@@ -18,8 +18,7 @@ class _CacheEntry {
 }
 
 class ApiService {
-  // TODO: replace with Railway URL after deploy (e.g. https://your-app.railway.app)
-  static const String baseUrl = 'https://YOUR_APP.railway.app';
+  static const String baseUrl = 'https://ai-job-search-mobile-production.up.railway.app';
   static const _timeout = Duration(seconds: 15);
 
   // ── In-memory cache ────────────────────────────────────────────────────────
