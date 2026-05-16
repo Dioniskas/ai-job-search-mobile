@@ -27,6 +27,8 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT ?? 5000;
 
+app.set('trust proxy', 1);
+
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images from ImageKit
