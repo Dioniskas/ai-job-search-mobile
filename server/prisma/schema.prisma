@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  SEEKER
+  EMPLOYER
+  ADMIN
+}
+
+enum ApplicationStatus {
+  PENDING
+  VIEWED
+  ACCEPTED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  PAYME
+  CLICK
+}
+
+enum BoostType {
+  RESUME_BOOST
+  VACANCY_BOOST
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      Role
+  fcmToken  String?
+  isBlocked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  emailNotifications   Json?
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+
+  seekerProfile       SeekerProfile?
+  employerProfile     Employer?
+  sentMessages        Message[]      @relation("SentMessages")
+  receivedMessages    Message[]      @relation("ReceivedMessages")
+  notifications       Notification[]
+  reportsMade         Report[]       @relation("ReportsMade")
+  payments            Payment[]
+
+  @@map("users")
+}
+
+// ─── Seeker ───────────────────────────────────────────────────────────────────
+
+model SeekerProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  firstName   String
+  lastName    String
+  middleName  String?
+  age         Int?
+  phone       String?
+  city        String?
+  photoUrl    String?
+  about       String?
+  isVisible    Boolean   @default(true)
+  searchStatus String    @default("ACTIVE")
+  boostedUntil DateTime?
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resumes      Resume[]
+  skillTests   SkillTest[]
+  applications Application[]
+  savedVacancies SavedVacancy[]
+  subscriptions  VacancySubscription[]
+
+  @@map("seeker_profiles")
+}
+
+model Resume {
+  id           String   @id @default(cuid())
+  seekerId     String
+  title        String
+  content      Json
+  pdfUrl       String?
+  isAiGenerated Boolean @default(false)
+  isMain       Boolean  @default(false)
+  skills       String[]
+  experience   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  seeker       SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@map("resumes")
+}
+
+model SkillTest {
+  id       String   @id @default(cuid())
+  seekerId String
+  skill    String
+  score    Int
+  passedAt DateTime @default(now())
+
+  seeker   SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+
+  @@map("skill_tests")
+}
+
+// ─── Employer ─────────────────────────────────────────────────────────────────
+
+model Employer {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  companyName String
+  description String?
+  website     String?
+  logoUrl     String?
+  city        String?
+  isVerified  Boolean @default(false)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vacancies    Vacancy[]
+  applications Application[]
+
+  @@map("employers")
+}
+
+// ─── Vacancies ────────────────────────────────────────────────────────────────
+
+model Vacancy {
+  id             String    @id @default(cuid())
+  employerId     String
+  title          String
+  description    String
+  salaryMin      Int?
+  salaryMax      Int?
+  city           String?
+  lat            Float?
+  lng            Float?
+  employmentType String?
+  experience     String?
+  isActive       Boolean   @default(true)
+  isModerated    Boolean   @default(false)
+  boostedUntil   DateTime?
+  viewCount      Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  employer       Employer      @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applications   Application[]
+  savedBy        SavedVacancy[]
+
+  @@map("vacancies")
+}
+
+// ─── Applications ─────────────────────────────────────────────────────────────
+
+model Application {
+  id           String            @id @default(cuid())
+  resumeId     String
+  vacancyId    String
+  seekerId     String
+  employerId   String
+  status       ApplicationStatus @default(PENDING)
+  coverLetter  String?
+  matchPercent Int?
+  createdAt    DateTime          @default(now())
+
+  resume    Resume        @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  vacancy   Vacancy       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  seeker    SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  employer  Employer      @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@unique([resumeId, vacancyId])
+  @@map("applications")
+}
+
+// ─── Messaging ────────────────────────────────────────────────────────────────
+
+model Message {
+  id            String   @id @default(cuid())
+  senderId      String
+  receiverId    String
+  applicationId String
+  text          String
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  sender      User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  text      String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── Saved vacancies ──────────────────────────────────────────────────────────
+
+model SavedVacancy {
+  id        String   @id @default(cuid())
+  seekerId  String
+  vacancyId String
+  createdAt DateTime @default(now())
+
+  seeker    SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  vacancy   Vacancy       @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+
+  @@unique([seekerId, vacancyId])
+  @@map("saved_vacancies")
+}
+
+// ─── Refresh tokens ───────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+model Report {
+  id         String    @id @default(cuid())
+  reporterId String
+  targetId   String
+  targetType String
+  reason     String
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  reporter   User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+// ─── Vacancy subscriptions ────────────────────────────────────────────────────
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+model Payment {
+  id            String          @id @default(cuid())
+  userId        String
+  type          BoostType
+  provider      PaymentProvider
+  amount        Int
+  status        PaymentStatus   @default(PENDING)
+  transactionId String?
+  vacancyId     String?
+  days          Int
+  createdAt     DateTime        @default(now())
+
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// ─── Vacancy subscriptions ────────────────────────────────────────────────────
+
+model VacancySubscription {
+  id             String   @id @default(cuid())
+  seekerId       String
+  query          String?
+  city           String?
+  salaryMin      Int?
+  employmentType String?
+  createdAt      DateTime @default(now())
+
+  seeker         SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+
+  @@map("vacancy_subscriptions")
+}
