@@ -135,26 +135,46 @@ class ApiService {
 
   static Map<String, dynamic> _parse(http.Response response) {
     if (response.statusCode == 401) throw const UnauthorizedException();
-    final body = json.decode(response.body) as Map<String, dynamic>;
-    if (body['success'] == true) return body['data'] as Map<String, dynamic>;
-    throw Exception(body['error'] ?? 'Неизвестная ошибка');
+    try {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      if (body['success'] == true) return body['data'] as Map<String, dynamic>;
+      final msg = body['error'] ?? body['message'] ?? response.body;
+      throw Exception('[${response.statusCode}] $msg');
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      throw Exception('[${response.statusCode}] ${response.body}');
+    }
   }
 
-  // Like _parse but never throws UnauthorizedException — for public endpoints
-  // (login, register) where 401 means wrong credentials, not expired token.
   static Map<String, dynamic> _parsePublic(http.Response response) {
-    final body = json.decode(response.body) as Map<String, dynamic>;
-    if (body['success'] == true) return body['data'] as Map<String, dynamic>;
-    throw Exception(body['error'] ?? 'Неизвестная ошибка');
+    try {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      if (body['success'] == true) return body['data'] as Map<String, dynamic>;
+      final msg = body['error'] ?? body['message'] ?? response.body;
+      throw Exception('[${response.statusCode}] $msg');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('[${response.statusCode}] ${response.body}');
+    }
   }
 
   static Future<Map<String, dynamic>> _parseStreamed(
       http.StreamedResponse streamed) async {
     final bodyStr = await streamed.stream.bytesToString();
     if (streamed.statusCode == 401) throw const UnauthorizedException();
-    final body = json.decode(bodyStr) as Map<String, dynamic>;
-    if (body['success'] == true) return body['data'] as Map<String, dynamic>;
-    throw Exception(body['error'] ?? 'Неизвестная ошибка');
+    try {
+      final body = json.decode(bodyStr) as Map<String, dynamic>;
+      if (body['success'] == true) return body['data'] as Map<String, dynamic>;
+      final msg = body['error'] ?? body['message'] ?? bodyStr;
+      throw Exception('[${streamed.statusCode}] $msg');
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      throw Exception('[${streamed.statusCode}] $bodyStr');
+    }
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────
