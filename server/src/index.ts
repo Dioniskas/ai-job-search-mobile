@@ -32,18 +32,21 @@ const PORT = process.env.PORT ?? 5000;
 app.set('trust proxy', 1);
 
 // ── CORS — должен быть ПЕРВЫМ до helmet ──────────────────────────────────────
-app.use(cors({
+const corsOptions: cors.CorsOptions = {
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
-app.options('*', cors());
+  exposedHeaders: ['Content-Disposition'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   crossOriginOpenerPolicy: false,
+  contentSecurityPolicy: false,
 }));
 
 // ── Rate limiting: 100 req/min per IP ────────────────────────────────────────

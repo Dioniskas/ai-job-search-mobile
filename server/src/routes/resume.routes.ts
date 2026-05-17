@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
-import { uploadPdf, uploadAudio } from '../middleware/upload.middleware';
+import { uploadPdf, uploadAudio, uploadSingle } from '../middleware/upload.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { generateResumeTextSchema } from '../validation/schemas';
-import { ..., uploadResumePhoto } from '../controllers/resume.controller';
 import {
   getResumes,
   uploadPdf as uploadPdfCtrl,
@@ -15,6 +14,7 @@ import {
   scoreResumeCtrl,
   generateResumePdf,
   setMainResume,
+  uploadResumePhoto,
 } from '../controllers/resume.controller';
 
 const router = Router();
@@ -31,7 +31,7 @@ router.post('/:id/score',              scoreResumeCtrl);
 router.put('/:id/main',                setMainResume);
 router.put('/:id',                     updateResume);
 router.delete('/:id',                  deleteResume);
-router.post('/:id/photo', auth, upload.single('photo'), uploadResumePhoto);
+router.post('/:id/photo', uploadSingle('photo'), uploadResumePhoto);
 
 
 export default router;
