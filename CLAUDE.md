@@ -4,7 +4,8 @@
 Мобильное приложение для поиска работы с ИИ-функциями.
 Два типа пользователей: соискатели и работодатели.
 Фронтенд: Flutter + Dart.
-Бэкенд: Node.js + Express (работает на порту 5000).
+Бэкенд: Node.js + Express (задеплоен на Railway).
+База данных: PostgreSQL на Supabase.
 Сначала Android, потом iOS.
 
 ---
@@ -16,24 +17,38 @@
 - go_router (навигация)
 - provider (стейт-менеджмент)
 - http (API запросы)
-- flutter_secure_storage (хранение JWT и настроек)
+- flutter_secure_storage (хранение JWT)
 - image_picker (выбор фото)
 - file_picker (выбор PDF)
 - flutter_sound (запись голоса)
 - flutter_map (карта вакансий)
 - printing + pdf (генерация PDF резюме)
+- cached_network_image (кеширование изображений)
+- firebase_messaging (push-уведомления)
 - Material Design 3
 
 ### Бэкенд (server/) — Node.js
 - Node.js + Express + TypeScript
-- Prisma ORM + PostgreSQL
+- Prisma ORM + PostgreSQL (Supabase)
 - JWT авторизация + Refresh токены
 - Socket.io (чат)
 - Multer + ImageKit (файлы)
 - Groq API: llama-3.3-70b-versatile (текст), whisper-large-v3 (голос)
-- helmet.js (безопасность)
-- express-rate-limit (защита от брутфорса)
-- zod (валидация данных)
+- helmet.js, express-rate-limit, zod
+- nodemailer (email)
+- firebase-admin (push-уведомления)
+
+---
+
+## Деплой
+
+### Бэкенд
+- Railway: https://ai-job-search-mobile-production.up.railway.app
+- БД: Supabase PostgreSQL
+
+### Мобильное приложение
+- APK собран: client/build/app/outputs/flutter-apk/app-release.apk
+- API URL в api_service.dart: https://ai-job-search-mobile-production.up.railway.app
 
 ---
 
@@ -42,16 +57,16 @@
 ```
 client/
 ├── lib/
-│   ├── main.dart                    # Точка входа, роутер, ThemeProvider
+│   ├── main.dart
 │   ├── screens/
 │   │   ├── auth/
 │   │   │   ├── login_screen.dart
 │   │   │   └── register_screen.dart
 │   │   ├── seeker/
 │   │   │   ├── seeker_dashboard.dart
-│   │   │   ├── seeker_profile_screen.dart   # только фото + выбор основного резюме
+│   │   │   ├── seeker_profile_screen.dart
 │   │   │   ├── resume_list_screen.dart
-│   │   │   ├── resume_view_screen.dart      # просмотр + редактирование + скачать PDF
+│   │   │   ├── resume_view_screen.dart
 │   │   │   ├── resume_edit_screen.dart
 │   │   │   ├── vacancy_search_screen.dart
 │   │   │   ├── vacancy_detail_screen.dart
@@ -72,11 +87,10 @@ client/
 │   │   └── shared/
 │   │       ├── map_screen.dart
 │   │       └── notifications_screen.dart
-│   ├── services/
-│   │   └── api_service.dart
+│   ├── services/api_service.dart
 │   ├── providers/
 │   │   ├── auth_provider.dart
-│   │   └── theme_provider.dart       # глобальная тёмная тема
+│   │   └── theme_provider.dart
 │   ├── models/
 │   └── widgets/
 │
@@ -85,10 +99,14 @@ client/
 
 ---
 
-## База данных — таблицы
+## База данных (Supabase)
 
 ### users
-- id, email, password, role (SEEKER | EMPLOYER), createdAt
+- id, email, password, role (SEEKER | EMPLOYER | ADMIN)
+- fcmToken, isBlocked (default false)
+- emailNotifications (JSONB)
+- passwordResetToken, passwordResetExpires
+- createdAt
 
 ### seeker_profiles
 - id, userId, photoUrl, city
@@ -97,14 +115,12 @@ client/
 ### resumes
 - id, seekerId, title, content (JSON), pdfUrl, isAiGenerated
 - skills (array), experience, aiScore, aiScoreFeedback
-- isMain (основное резюме — только одно может быть true)
+- isMain (основное резюме)
 - createdAt, updatedAt
 
-### skill_tests
-- id, seekerId, skill, score, passedAt
-
 ### employers
-- id, userId, companyName, description, website, logoUrl, city, rating, reviewCount
+- id, userId, companyName, description, website, logoUrl, city
+- rating, reviewCount, isVerified
 
 ### employer_reviews
 - id, seekerId, employerId, rating (1-5), comment, createdAt
@@ -131,37 +147,32 @@ client/
 ### vacancy_subscriptions
 - id, seekerId, query, city, salaryMin, employmentType, createdAt
 
-### seeker_analytics
-- id, seekerId, resumeViews, applicationsSent, responsesReceived, invitationsReceived
-
-### employer_analytics
-- id, employerId, vacancyId, views, applications, invited, hired
-
-### viewed_vacancies
-- id, seekerId, vacancyId, viewedAt
-
-### user_badges
-- id, userId, badge, earnedAt
-
 ### refresh_tokens
 - id, userId, token, expiresAt, createdAt
 
+### reports
+- id, reporterId, targetId, targetType, reason, isResolved, createdAt
+
 ### payments
-- id, userId, type (RESUME_BOOST | VACANCY_BOOST), amount, status, createdAt
+- id, userId, type, amount, status, createdAt
+
+### seeker_analytics, employer_analytics, viewed_vacancies, user_badges, skill_tests
 
 ---
 
-## API роуты (бэкенд)
+## API роуты
 
 ### Авторизация
-- POST /api/auth/register
+- POST /api/auth/register (role: SEEKER | EMPLOYER)
 - POST /api/auth/login
-- POST /api/auth/refresh — обновление access токена
+- POST /api/auth/refresh
 - POST /api/auth/logout
 - GET /api/auth/me
+- POST /api/auth/forgot-password
+- POST /api/auth/reset-password
 
 ### Соискатель
-- GET/PUT /api/seeker/profile — только фото и searchStatus
+- GET/PUT /api/seeker/profile
 - POST /api/seeker/profile/photo
 - PUT /api/seeker/profile/search-status
 
@@ -172,18 +183,13 @@ client/
 - POST /api/resume/generate/text
 - POST /api/resume/generate/voice
 - POST /api/resume/:id/score
-- GET /api/resume/:id/pdf — скачать PDF
-- PUT /api/resume/:id — редактировать резюме
-- PUT /api/resume/:id/set-main — установить как основное
+- GET /api/resume/:id/pdf
+- PUT /api/resume/:id
+- PUT /api/resume/:id/set-main
 - DELETE /api/resume/:id
 
-### Тесты навыков
-- GET /api/skills/tests
-- POST /api/skills/tests/:skill/submit
-- GET /api/skills/results
-
 ### Вакансии
-- GET /api/vacancies
+- GET /api/vacancies (с пагинацией page/limit)
 - GET /api/vacancies/map
 - GET /api/vacancies/:id
 - GET /api/vacancies/:id/similar
@@ -192,7 +198,7 @@ client/
 - DELETE /api/vacancies/:id
 
 ### ИИ-функции
-- POST /api/ai/match-vacancies — использует основное резюме (isMain: true)
+- POST /api/ai/match-vacancies (использует isMain резюме)
 - POST /api/ai/match-resumes
 - POST /api/ai/cover-letter
 - POST /api/ai/match-percent
@@ -210,7 +216,7 @@ client/
 - PUT /api/applications/:id/status
 - PUT /api/applications/:id/viewed
 
-### Чат
+### Чат + Socket.io
 - GET /api/chat/conversations
 - GET /api/chat/:applicationId/messages
 - POST /api/chat/:applicationId/messages
@@ -231,10 +237,61 @@ client/
 - POST /api/employer/reviews
 - GET /api/employer/:id/reviews
 
+### Модерация (Admin)
+- POST /api/admin/vacancies/:id/moderate
+- POST /api/admin/employers/:id/verify
+- POST /api/admin/users/:id/block
+- POST /api/admin/create-admin
+
+### Жалобы
+- POST /api/reports
+
 ### Монетизация
 - POST /api/boost/resume
 - POST /api/boost/vacancy
 - GET /api/payments/history
+- POST /api/payments/payme/create (тестовый режим)
+- POST /api/payments/click/create (тестовый режим)
+
+### Push-уведомления
+- POST /api/users/fcm-token
+
+### Email настройки
+- PUT /api/users/email-notifications
+
+---
+
+## Переменные окружения (server/.env и Railway)
+
+```
+DATABASE_URL=postgresql://...pooler...6543...?pgbouncer=true&connection_limit=1
+DIRECT_URL=postgresql://...session pooler...5432...
+JWT_SECRET=den7026960
+JWT_REFRESH_SECRET=den7026960_refresh_secret_change_in_prod
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=30d
+PORT=5000
+GROQ_API_KEY=...
+IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/dioniskas
+IMAGEKIT_PUBLIC_KEY=...
+IMAGEKIT_PRIVATE_KEY=...
+FIREBASE_PROJECT_ID=ai-job-search-70a97
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY=...
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=den7026960@gmail.com
+EMAIL_PASS=...
+FRONTEND_URL=https://ai-job-search-mobile-production.up.railway.app
+CLIENT_URL=https://ai-job-search-mobile-production.up.railway.app
+PAYME_MERCHANT_ID=test
+PAYME_SECRET_KEY=test
+PAYME_TEST_MODE=true
+CLICK_SERVICE_ID=test
+CLICK_MERCHANT_ID=test
+CLICK_SECRET_KEY=test
+CLICK_TEST_MODE=true
+```
 
 ---
 
@@ -244,126 +301,86 @@ client/
 - Акцентный: зелёный (#16A34A)
 - Предупреждения: оранжевый (#F97316)
 - Фон светлый: #FFFFFF, тёмный: #0F172A
-- Material Design 3
-- Bottom navigation bar
+- Material Design 3, Bottom navigation bar
 - Глобальная тёмная тема через ThemeProvider
 - Все тексты на русском языке
 
 ---
 
-## Переменные окружения
+## Статус блоков
 
-### server/.env
-```
-DATABASE_URL=postgresql://...
-JWT_SECRET=...
-JWT_REFRESH_SECRET=...
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=30d
-GROQ_API_KEY=...
-IMAGEKIT_URL_ENDPOINT=...
-IMAGEKIT_PUBLIC_KEY=...
-IMAGEKIT_PRIVATE_KEY=...
-PORT=5000
-```
+### ✅ Блок 1 — Доделка (ГОТОВО)
+- Редактирование резюме, скачать PDF, профиль упрощён, выбор основного резюме
 
-### client — API URL в api_service.dart
-```dart
-static const String baseUrl = 'http://192.168.1.107:5000';
-```
-⚠️ При деплое заменить на Railway URL
+### ✅ Блок 2 — Безопасность (ГОТОВО)
+- Rate limiting, Helmet.js, zod, CORS, refresh токены, обработка ошибок
+
+### ✅ Блок 3 — Производительность (ГОТОВО)
+- Пагинация, бесконечная прокрутка, кеширование, debounce поиск, cached_network_image
+
+### ✅ Блок 4 — Push-уведомления (ГОТОВО)
+- Firebase FCM, уведомления при откликах, сообщениях, изменении статуса
+
+### ✅ Блок 5 — Email уведомления (ГОТОВО)
+- Nodemailer, Gmail SMTP, приветствие, отклики, сброс пароля
+
+### ✅ Блок 6 — Модерация и верификация (ГОТОВО)
+- Модерация вакансий, верификация работодателей, жалобы, блокировка
+
+### ✅ Блок 7 — Монетизация (ГОТОВО)
+- Payme и Click (тестовый режим), поднятие резюме/вакансий, история платежей
+
+### ✅ Блок 8 — Админ панель (ГОТОВО)
+- React веб-панель на localhost:3001, вход через ADMIN роль
+- Дашборд, пользователи, вакансии, верификация, жалобы, платежи
+
+### ✅ Блок 9 — Политика и документы (ГОТОВО)
+- Политика конфиденциальности, пользовательское соглашение, поддержка
+
+### 🔄 Блок 10 — Деплой и релиз (В ПРОЦЕССЕ)
+- ✅ Supabase БД настроена и мигрирована
+- ✅ Railway деплой настроен
+- ✅ APK собран
+- ❌ APK не работает — ошибка 502 при входе (проблема с колонками в Supabase)
+- Текущая проблема: добавляем недостающие колонки в Supabase через SQL Editor
+
+### 📋 Блок 11 — Локализация (Узбекский язык)
+- flutter_localizations
+- Переключатель язык: Русский / O'zbekcha
+- Все тексты и ИИ промпты на узбекском
+
+### 📋 Блок 12 — iOS версия
+- Адаптация Flutter под iOS
+- Публикация в App Store
 
 ---
 
-## План блоков (текущий статус)
+## Текущие проблемы (требуют решения)
 
-### ✅ Блок 0 — Спринты 1-10 (ГОТОВО)
-- Flutter приложение, авторизация JWT
-- Профили соискателя и работодателя
-- 4 способа создания резюме с ИИ
-- Вакансии, карта, фильтры
-- ИИ-поиск, % совпадения, зарплата
-- Отклики, избранное, уведомления
-- Чат Socket.io
-- Аналитика, бейджи, рейтинг работодателей
-- Тесты навыков, подготовка к интервью
-- Тёмная тема, монетизация
-
-### 🔄 Блок 1 — Доделка (В ПРОЦЕССЕ)
-- Тёмная тема глобально (не работает)
-- Редактирование созданного резюме
-- Скачать резюме PDF (missingPluginException)
-- Профиль — только фото + выбор основного резюме
-- Выбор основного резюме (isMain)
-
-### 📋 Блок 2 — Безопасность
-- Rate limiting, Helmet.js, zod валидация
-- CORS настройка
-- Refresh токены
-- Обработка ошибок сети
-
-### 📋 Блок 3 — Производительность
-- Пагинация (по 20 штук)
-- Кеширование запросов
-- Поиск в реальном времени
-- Оптимизация изображений
-
-### 📋 Блок 4 — Push-уведомления (FCM)
-- Firebase Cloud Messaging
-- Новый отклик, просмотр резюме
-- Новые вакансии по подписке
-- Приглашение на интервью
-
-### 📋 Блок 5 — Email уведомления
-- Nodemailer или SendGrid
-- Приветственное письмо, отклики, сброс пароля
-
-### 📋 Блок 6 — Модерация и верификация
-- Модерация вакансий
-- Верификация работодателей
-- Жалобы, блокировка спама
-
-### 📋 Блок 7 — Монетизация
-- Интеграция Payme (Узбекистан)
-- Интеграция Click (Узбекистан)
-- История платежей
-
-### 📋 Блок 8 — Админ панель
-- Веб-панель администратора
-- Управление пользователями и вакансиями
-- Статистика платформы
-- Модерация жалоб
-
-### 📋 Блок 9 — Политика и документы
-- Политика конфиденциальности
-- Пользовательское соглашение
-- Поддержка пользователей
-
-### 📋 Блок 10 — Деплой и релиз
-- Деплой сервера на Railway (HTTPS)
-- База данных в облаке (Supabase)
-- Сборка APK
-- Публикация в Google Play
-
-### 📋 Блок 11 — iOS версия
-- Адаптация Flutter под iOS
-- Публикация в App Store
+1. APK выдаёт 502 при входе — в Supabase не хватает колонок
+2. Тёмная тема не работает глобально (только профиль и резюме)
+3. Карта вакансий не работает (отложено)
+4. Тестовые вакансии не созданы (seed не выполнен)
+5. Нужно сменить все ключи API (они были показаны в открытом чате)
 
 ---
 
 ## Важные заметки для Claude
 
 - Все ИИ-промпты начинать с "Отвечай ТОЛЬКО на русском языке."
-- Всегда проверяй роль пользователя (SEEKER/EMPLOYER)
 - Groq базовый URL: https://api.groq.com/openai/v1
 - Groq модель текст: llama-3.3-70b-versatile
 - Groq модель голос: whisper-large-v3
-- API URL в Flutter: http://192.168.1.107:5000 (при деплое заменить)
+- API URL Flutter: https://ai-job-search-mobile-production.up.railway.app
 - JWT хранить в flutter_secure_storage
-- Refresh токен хранить отдельно в flutter_secure_storage
-- ИИ-подбор всегда использует резюме где isMain = true
+- ИИ-подбор использует резюме где isMain = true
 - Socket.io namespace /chat
-- PDF генерировать через printing + pdf пакеты в Flutter
-- Профиль соискателя — только фото и выбор основного резюме
-- isMain — только одно резюме может быть основным одновременно
-- boostedUntil — поднимать в сортировке где boostedUntil > now()
+- PDF генерировать через printing + pdf в Flutter
+- Профиль соискателя: только фото + выбор основного резюме + настройки
+- isMain — только одно резюме может быть основным
+- Новые вакансии показываются только если isModerated = true
+- trust proxy 1 добавлен в index.ts для Railway
+- Админ: den7026960@gmail.com / den58354037
+- GitHub: https://github.com/Dioniskas/ai-job-search-mobile
+- Railway root directory: server/
+- Keystore для APK сохранён — без него нельзя обновить приложение в Google Play
