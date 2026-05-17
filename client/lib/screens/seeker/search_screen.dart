@@ -59,10 +59,13 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
 
   // Filters
   String _city = '';
-  String _salaryMin = '';
-  String _salaryMax = '';
+  int? _salaryMin;
+  int? _salaryMax;
   String? _employmentType;
   String? _experience;
+
+  // Sort
+  String _sortBy = 'date'; // 'date' | 'salary' | 'relevance'
 
   // Map / Saved
   List<dynamic> _mapVacancies = [];
@@ -130,11 +133,30 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
     final q = _searchCtrl.text.trim();
     if (q.isNotEmpty) m['search'] = q;
     if (_city.isNotEmpty) m['city'] = _city;
-    if (_salaryMin.isNotEmpty) m['salaryMin'] = _salaryMin;
-    if (_salaryMax.isNotEmpty) m['salaryMax'] = _salaryMax;
+    if (_salaryMin != null) m['salaryMin'] = '$_salaryMin';
+    if (_salaryMax != null) m['salaryMax'] = '$_salaryMax';
     if (_employmentType != null) m['employmentType'] = _employmentType!;
     if (_experience != null) m['experience'] = _experience!;
     return m;
+  }
+
+  List<dynamic> get _sortedVacancies {
+    final list = List<dynamic>.from(_vacancies);
+    if (_sortBy == 'salary') {
+      list.sort((a, b) {
+        final aMax = (a['salaryMax'] as int?) ?? (a['salaryMin'] as int?) ?? 0;
+        final bMax = (b['salaryMax'] as int?) ?? (b['salaryMin'] as int?) ?? 0;
+        return bMax.compareTo(aMax);
+      });
+    } else if (_sortBy == 'relevance') {
+      list.sort((a, b) {
+        final aB = a['boostedUntil'] != null ? 1 : 0;
+        final bB = b['boostedUntil'] != null ? 1 : 0;
+        return bB.compareTo(aB);
+      });
+    }
+    // 'date' — server already returns sorted by date
+    return list;
   }
 
   Future<void> _loadVacancies({bool reset = false}) async {
@@ -212,19 +234,20 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
   }
 
   bool get _hasFilters =>
-      _city.isNotEmpty || _salaryMin.isNotEmpty ||
-      _salaryMax.isNotEmpty || _employmentType != null || _experience != null;
+      _city.isNotEmpty || _salaryMin != null ||
+      _salaryMax != null || _employmentType != null || _experience != null;
+
+  static const _salarySliderMax = 5000000.0;
 
   void _openFilters() {
     var city = _city;
-    var sMin = _salaryMin;
-    var sMax = _salaryMax;
     var empType = _employmentType;
     var exp = _experience;
-
+    var sliderRange = RangeValues(
+      (_salaryMin ?? 0).toDouble(),
+      (_salaryMax ?? _salarySliderMax).toDouble(),
+    );
     final cityCtrl = TextEditingController(text: city);
-    final sMinCtrl = TextEditingController(text: sMin);
-    final sMaxCtrl = TextEditingController(text: sMax);
 
     showModalBottomSheet(
       context: context,
@@ -234,95 +257,128 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) => Padding(
-          padding: EdgeInsets.only(
-            left: 20, right: 20, top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Text('Фильтры',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {
-                    setSheet(() {
-                      city = ''; sMin = ''; sMax = '';
-                      empType = null; exp = null;
-                    });
-                    cityCtrl.clear(); sMinCtrl.clear(); sMaxCtrl.clear();
-                  },
-                  child: const Text('Сбросить'),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              _sheetField(cityCtrl, 'Город', (v) { city = v; }),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: _sheetField(
-                  sMinCtrl, 'Зарплата от', (v) { sMin = v; },
-                  keyboard: TextInputType.number,
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: _sheetField(
-                  sMaxCtrl, 'до', (v) { sMax = v; },
-                  keyboard: TextInputType.number,
-                )),
-              ]),
-              const SizedBox(height: 16),
-              const Text('Тип занятости',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8, runSpacing: 8,
-                children: _employmentTypes.map((t) => FilterChip(
-                  label: Text(_employmentLabels[t] ?? t),
-                  selected: empType == t,
-                  onSelected: (v) => setSheet(() => empType = v ? t : null),
-                  selectedColor: const Color(0xFFDBEAFE),
-                  checkmarkColor: _blue,
-                )).toList(),
-              ),
-              const SizedBox(height: 16),
-              const Text('Опыт работы',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8, runSpacing: 8,
-                children: _experienceOptions.map((e) => FilterChip(
-                  label: Text(_experienceLabels[e] ?? e),
-                  selected: exp == e,
-                  onSelected: (v) => setSheet(() => exp = v ? e : null),
-                  selectedColor: const Color(0xFFDBEAFE),
-                  checkmarkColor: _blue,
-                )).toList(),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _blue,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+        builder: (ctx, setSheet) {
+          String fmt(double v) => v >= _salarySliderMax
+              ? '∞'
+              : '${(v ~/ 1000)} тыс.';
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20, right: 20, top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Text('Фильтры',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () {
+                      setSheet(() {
+                        city = '';
+                        empType = null; exp = null;
+                        sliderRange = const RangeValues(0, _salarySliderMax);
+                      });
+                      cityCtrl.clear();
+                    },
+                    child: const Text('Сбросить'),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _city = cityCtrl.text.trim();
-                      _salaryMin = sMinCtrl.text.trim();
-                      _salaryMax = sMaxCtrl.text.trim();
-                      _employmentType = empType;
-                      _experience = exp;
-                    });
-                    Navigator.pop(ctx);
-                    _loadVacancies(reset: true);
-                  },
-                  child: const Text('Применить', style: TextStyle(fontSize: 16)),
+                ]),
+                const SizedBox(height: 16),
+                _sheetField(cityCtrl, 'Город', (v) { city = v; }),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Зарплата, сум',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      '${fmt(sliderRange.start)} — ${fmt(sliderRange.end)}',
+                      style: const TextStyle(color: _blue, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
-              ),
-            ]),
-          ),
-        ),
+                const SizedBox(height: 4),
+                RangeSlider(
+                  values: sliderRange,
+                  min: 0,
+                  max: _salarySliderMax,
+                  divisions: 50,
+                  activeColor: _blue,
+                  onChanged: (v) => setSheet(() => sliderRange = v),
+                ),
+                const SizedBox(height: 8),
+                const Text('Тип занятости',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: _employmentTypes.map((t) => FilterChip(
+                    label: Text(_employmentLabels[t] ?? t),
+                    selected: empType == t,
+                    onSelected: (v) => setSheet(() => empType = v ? t : null),
+                    selectedColor: const Color(0xFFDBEAFE),
+                    checkmarkColor: _blue,
+                  )).toList(),
+                ),
+                const SizedBox(height: 16),
+                const Text('Опыт работы',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: _experienceOptions.map((e) => FilterChip(
+                    label: Text(_experienceLabels[e] ?? e),
+                    selected: exp == e,
+                    onSelected: (v) => setSheet(() => exp = v ? e : null),
+                    selectedColor: const Color(0xFFDBEAFE),
+                    checkmarkColor: _blue,
+                  )).toList(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _blue,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _city = cityCtrl.text.trim();
+                        _salaryMin = sliderRange.start > 0
+                            ? sliderRange.start.toInt() : null;
+                        _salaryMax = sliderRange.end < _salarySliderMax
+                            ? sliderRange.end.toInt() : null;
+                        _employmentType = empType;
+                        _experience = exp;
+                      });
+                      Navigator.pop(ctx);
+                      _loadVacancies(reset: true);
+                    },
+                    child: const Text('Применить', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _sortChip(String value, String label) {
+    final selected = _sortBy == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => setState(() => _sortBy = value),
+      selectedColor: const Color(0xFFDBEAFE),
+      checkmarkColor: _blue,
+      labelStyle: TextStyle(
+        color: selected ? _blue : _slate,
+        fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        fontSize: 13,
       ),
     );
   }
@@ -422,6 +478,18 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
           ),
         ]),
       ),
+      // ── Sort chips ──────────────────────────────────────────────────────────
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(children: [
+          _sortChip('date', 'По дате'),
+          const SizedBox(width: 8),
+          _sortChip('salary', 'По зарплате'),
+          const SizedBox(width: 8),
+          _sortChip('relevance', 'По релевантности'),
+        ]),
+      ),
       Expanded(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -434,9 +502,9 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
                         child: ListView.builder(
                           controller: _scrollCtrl,
                           padding: const EdgeInsets.all(12),
-                          itemCount: _vacancies.length + (_loadingMore ? 1 : 0),
+                          itemCount: _sortedVacancies.length + (_loadingMore ? 1 : 0),
                           itemBuilder: (context, index) {
-                            if (index == _vacancies.length) {
+                            if (index == _sortedVacancies.length) {
                               return const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 16),
                                 child: Center(
@@ -445,7 +513,7 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
                                 ),
                               );
                             }
-                            final v = _vacancies[index];
+                            final v = _sortedVacancies[index];
                             return _VacancyCard(
                               vacancy: v,
                               onTap: () => Navigator.push(
