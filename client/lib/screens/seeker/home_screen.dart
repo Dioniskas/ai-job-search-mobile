@@ -7,7 +7,6 @@ import 'vacancy_detail_screen.dart';
 
 const _blue  = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg    = Color(0xFFF8FAFC);
 
 class SeekerHomeScreen extends StatefulWidget {
   const SeekerHomeScreen({super.key});
@@ -55,7 +54,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -103,7 +102,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   void _showResumePicker() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -146,15 +145,16 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final history = VacancyHistory.items;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Главная',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
         actions: [
           Stack(
@@ -295,11 +295,11 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
 
             // ── История просмотров ───────────────────────────────────────────
             if (history.isNotEmpty) ...[
-              const Text('Недавно просмотренные',
+              Text('Недавно просмотренные',
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: cs.onSurface)),
               const SizedBox(height: 10),
               SizedBox(
                 height: 80,
@@ -321,10 +321,9 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                         margin: const EdgeInsets.only(right: 10),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cs.surfaceContainer,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: cs.outlineVariant),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,10 +331,10 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                           children: [
                             Text(
                               v['title']!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
-                                  color: Color(0xFF0F172A)),
+                                  color: cs.onSurface),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -359,13 +358,13 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
             ],
 
             // ── Возможности ──────────────────────────────────────────────────
-            const Text('Возможности ИИ',
+            Text('Возможности ИИ',
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: cs.onSurface)),
             const SizedBox(height: 12),
-            _featureCard(
+            _featureCard(context,
               icon: Icons.percent_rounded,
               title: '% совпадения',
               subtitle:
@@ -373,7 +372,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
               color: const Color(0xFF16A34A),
             ),
             const SizedBox(height: 10),
-            _featureCard(
+            _featureCard(context,
               icon: Icons.edit_note_rounded,
               title: 'Сопроводительное письмо',
               subtitle:
@@ -381,7 +380,7 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
               color: Colors.purple,
             ),
             const SizedBox(height: 10),
-            _featureCard(
+            _featureCard(context,
               icon: Icons.payments_outlined,
               title: 'Рыночная зарплата',
               subtitle:
@@ -394,46 +393,48 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
     );
   }
 
-  Widget _featureCard({
+  Widget _featureCard(BuildContext context, {
     required IconData icon,
     required String title,
     required String subtitle,
     required Color color,
-  }) =>
-      Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
         ),
-        child: Row(children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: Color(0xFF0F172A))),
-              const SizedBox(height: 2),
-              Text(subtitle,
-                  style: const TextStyle(
-                      color: _slate, fontSize: 12, height: 1.4)),
-            ]),
-          ),
-        ]),
-      );
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+            Text(title,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: cs.onSurface)),
+            const SizedBox(height: 2),
+            Text(subtitle,
+                style: const TextStyle(
+                    color: _slate, fontSize: 12, height: 1.4)),
+          ]),
+        ),
+      ]),
+    );
+  }
 }
 
 // ── Notifications Bottom Sheet ─────────────────────────────────────────────────

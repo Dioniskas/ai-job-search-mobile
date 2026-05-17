@@ -12,7 +12,6 @@ import 'vacancy_detail_screen.dart';
 
 const _blue = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg = Color(0xFFF8FAFC);
 
 const _employmentTypes = [
   'FULL_TIME', 'PART_TIME', 'REMOTE', 'CONTRACT', 'INTERNSHIP',
@@ -230,7 +229,7 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -352,13 +351,14 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Поиск вакансий',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
         bottom: TabBar(
           controller: _tab,
@@ -382,9 +382,10 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
   // ── List tab ──────────────────────────────────────────────────────────────────
 
   Widget _buildList() {
+    final cs = Theme.of(context).colorScheme;
     return Column(children: [
       Container(
-        color: Colors.white,
+        color: cs.surface,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Row(children: [
           Expanded(
@@ -399,7 +400,7 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: _bg,
+                fillColor: cs.surfaceContainerHighest,
               ),
               // Search fires via debounce listener, not onSubmitted
               onSubmitted: (_) => _loadVacancies(reset: true),
@@ -413,7 +414,7 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen>
               icon: const Icon(Icons.tune_rounded),
               onPressed: _openFilters,
               style: IconButton.styleFrom(
-                backgroundColor: _bg,
+                backgroundColor: cs.surfaceContainerHighest,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -601,6 +602,7 @@ class _VacancyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final employer = vacancy['employer'] as Map<String, dynamic>?;
     final salaryMin = vacancy['salaryMin'] as int?;
     final salaryMax = vacancy['salaryMax'] as int?;
@@ -630,9 +632,9 @@ class _VacancyCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: BorderSide(color: cs.outlineVariant),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
@@ -648,10 +650,10 @@ class _VacancyCard extends StatelessWidget {
                     children: [
                       Text(
                         vacancy['title'] as String? ?? '',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A)),
+                            color: cs.onSurface),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -720,16 +722,21 @@ class _VacancyCard extends StatelessWidget {
     );
   }
 
-  Widget _chip(IconData icon, String label) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: const Color(0xFFF1F5F9),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 12, color: _slate),
-      const SizedBox(width: 4),
-      Text(label, style: const TextStyle(color: _slate, fontSize: 12)),
-    ]),
+  Widget _chip(IconData icon, String label) => Builder(
+    builder: (context) {
+      final cs = Theme.of(context).colorScheme;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 12, color: _slate),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: _slate, fontSize: 12)),
+        ]),
+      );
+    },
   );
 }
