@@ -190,13 +190,11 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? cs.surface : const Color(0xFFF8FAFC);
     final percent = _completionPercent;
     final hint = _completionHint;
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Профиль'),
         backgroundColor: cs.surface,
@@ -262,6 +260,18 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
                     ),
                     const SizedBox(height: 12),
 
+                    // ── Статус поиска работы ──────────────────────────────
+                    _buildSection(
+                      cs: cs,
+                      title: 'Статус поиска работы',
+                      children: [
+                        const SizedBox(height: 4),
+                        _buildSearchStatus(cs),
+                        const SizedBox(height: 4),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
                     // ── Настройки ─────────────────────────────────────────
                     _buildSection(
                       cs: cs,
@@ -306,7 +316,7 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
                           cs: cs,
                           icon: Icons.psychology_rounded,
                           label: 'Подготовка к интервью',
-                          subtitle: 'ИИ-тренер задаст вопросы и оценит ответы',
+                          subtitle: 'Ассистент задаст вопросы и оценит ответы',
                           color: const Color(0xFF7C3AED),
                           onTap: () => _navigate(const InterviewPrepScreen()),
                         ),
@@ -357,18 +367,6 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
                           subtitle: 'Версия 1.0.0',
                           onTap: () => _navigate(const AboutAppScreen()),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── Статус поиска работы ──────────────────────────────
-                    _buildSection(
-                      cs: cs,
-                      title: 'Статус поиска работы',
-                      children: [
-                        const SizedBox(height: 4),
-                        _buildSearchStatus(cs),
-                        const SizedBox(height: 4),
                       ],
                     ),
                     const SizedBox(height: 16),
