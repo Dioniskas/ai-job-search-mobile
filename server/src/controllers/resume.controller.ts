@@ -20,12 +20,20 @@ import {
 function findCyrillicFont(): string | undefined {
   const candidates = [
     nodePath.join(process.cwd(), 'fonts', 'FreeSans.ttf'),
+    nodePath.join(process.cwd(), 'fonts', 'DejaVuSans.ttf'),
+    // Railway / Debian
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+    '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+    '/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+    '/usr/share/fonts/truetype/open-sans/OpenSans-Regular.ttf',
+    // macOS
+    '/System/Library/Fonts/Supplemental/Arial.ttf',
+    '/Library/Fonts/Arial.ttf',
+    // Windows
     'C:\\Windows\\Fonts\\arial.ttf',
     'C:\\Windows\\Fonts\\times.ttf',
-    '/usr/share/fonts/truetype/freefont/FreeSans.ttf',
-    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-    '/System/Library/Fonts/Supplemental/Arial.ttf',
   ];
   return candidates.find(p => fs.existsSync(p));
 }
@@ -455,9 +463,11 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
     }
 
     const summary    = (content['summary']    as string | undefined) ?? '';
-    const experience = (content['experience'] as string | undefined) ?? '';
+    const experience = (content['experience'] as string | undefined) || resume.experience || '';
     const education  = (content['education']  as string | undefined) ?? '';
     const languages  = (content['languages']  as string | undefined) ?? '';
+    const aiScore        = content['aiScore']        as number | undefined;
+    const aiScoreSummary = (content['aiScoreSummary'] as string | undefined) ?? '';
 
     if (summary) {
       sectionTitle('О себе');
@@ -505,6 +515,12 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
     if (languages) {
       sectionTitle('Языки');
       sectionBody(languages);
+      if (aiScore != null) sectionGap();
+    }
+
+    if (aiScore != null) {
+      sectionTitle(`Оценка Ассистента: ${aiScore}/100`);
+      if (aiScoreSummary) sectionBody(aiScoreSummary);
     }
 
     doc.end();
