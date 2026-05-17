@@ -19,6 +19,9 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
   List<dynamic> _resumes = [];
   bool _initialized = false;
   int _unreadCount = 0;
+  int _applicationsCount = 0;
+  int _pendingCount = 0;
+  String _firstName = '';
 
   @override
   void didChangeDependencies() {
@@ -27,6 +30,8 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
       _initialized = true;
       _loadResumes();
       _loadNotifications();
+      _loadApplicationStats();
+      _loadProfile();
     }
   }
 
@@ -37,6 +42,25 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
     try {
       final list = await _auth.withAuth((t) => ApiService.getResumes(t));
       if (mounted) setState(() => _resumes = list);
+    } catch (_) {}
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final data = await _auth.withAuth((t) => ApiService.getSeekerProfile(t));
+      if (mounted) setState(() => _firstName = data['firstName'] as String? ?? '');
+    } catch (_) {}
+  }
+
+  Future<void> _loadApplicationStats() async {
+    try {
+      final list = await _auth.withAuth((t) => ApiService.getSeekerApplications(t));
+      if (mounted) {
+        setState(() {
+          _applicationsCount = list.length;
+          _pendingCount = list.where((a) => a['status'] == 'PENDING').length;
+        });
+      }
     } catch (_) {}
   }
 
@@ -193,12 +217,45 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
         onRefresh: () async {
           await _loadResumes();
           await _loadNotifications();
+          await _loadApplicationStats();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // ── Приветствие ─────────────────────────────────────────────────
+            _GreetingCard(firstName: _firstName, cs: cs),
+            const SizedBox(height: 16),
+
+            // ── Статистика ──────────────────────────────────────────────────
+            Row(children: [
+              Expanded(child: _StatChip(
+                icon: Icons.description_outlined,
+                label: 'Резюме',
+                value: '${_resumes.length}',
+                color: _blue,
+                cs: cs,
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: _StatChip(
+                icon: Icons.send_outlined,
+                label: 'Откликов',
+                value: '$_applicationsCount',
+                color: const Color(0xFF16A34A),
+                cs: cs,
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: _StatChip(
+                icon: Icons.hourglass_empty_rounded,
+                label: 'Ожидает',
+                value: '$_pendingCount',
+                color: Colors.orange,
+                cs: cs,
+              )),
+            ]),
+            const SizedBox(height: 16),
+
             // ── ИИ-подбор карточка ──────────────────────────────────────────
             Container(
               width: double.infinity,
@@ -432,6 +489,104 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                     color: _slate, fontSize: 12, height: 1.4)),
           ]),
         ),
+      ]),
+    );
+  }
+}
+
+// ── Greeting Card ─────────────────────────────────────────────────────────────
+
+class _GreetingCard extends StatelessWidget {
+  const _GreetingCard({required this.firstName, required this.cs});
+  final String firstName;
+  final ColorScheme cs;
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Доброе утро';
+    if (h < 18) return 'Добрый день';
+    return 'Добрый вечер';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = firstName.isNotEmpty ? ', $firstName' : '';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF2563EB).withValues(alpha: 0.08),
+            const Color(0xFF1D4ED8).withValues(alpha: 0.04),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.15)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.waving_hand_rounded,
+              color: Color(0xFF2563EB), size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('$_greeting$name!',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: cs.onSurface)),
+            const SizedBox(height: 2),
+            Text('Ваш поиск работы продолжается',
+                style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6))),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── Stat Chip ─────────────────────────────────────────────────────────────────
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.cs,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final ColorScheme cs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(value,
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface)),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.6))),
       ]),
     );
   }
