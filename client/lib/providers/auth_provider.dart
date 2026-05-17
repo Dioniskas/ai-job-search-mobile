@@ -40,6 +40,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> loginWithGoogle(String idToken) async {
+  try {
+    final data = await ApiService.googleLogin(idToken);
+    await _saveSession(data);
+    return null;
+  } catch (e) {
+    return _message(e);
+  }
+}
+
   Future<String?> register(String email, String password, String role) async {
     try {
       final data = await ApiService.register(email, password, role);

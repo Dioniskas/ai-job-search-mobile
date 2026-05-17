@@ -189,6 +189,15 @@ class ApiService {
     return _parsePublic(response);
   }
 
+  static Future<Map<String, dynamic>> googleLogin(String idToken) async {
+  final response = await _safePost(
+    Uri.parse('$baseUrl/api/auth/google/mobile'),
+    headers: _headers(),
+    body: json.encode({'idToken': idToken}),
+  );
+  return _parsePublic(response);
+}
+
   static Future<Map<String, dynamic>> register(
       String email, String password, String role) async {
     final response = await _safePost(

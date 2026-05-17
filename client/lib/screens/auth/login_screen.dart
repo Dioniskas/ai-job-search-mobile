@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,6 +43,33 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     }
   }
+
+  Future<void> _signInWithGoogle() async {
+  try {
+    final googleSignIn = GoogleSignIn(
+      clientId: '310538934424-3282vr0l4eciq6upttgk19948slu5ta7.apps.googleusercontent.com',
+    );
+    final account = await googleSignIn.signIn();
+    if (account == null) return;
+    final auth = await account.authentication;
+    final idToken = auth.idToken;
+    if (idToken == null) throw Exception('No idToken');
+    if (!mounted) return;
+    final error = await context.read<AuthProvider>().loginWithGoogle(idToken);
+if (error != null && mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
+  );
+  return;
+}
+    if (!mounted) return;
+    context.go('/');
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Ошибка: $e'), behavior: SnackBarBehavior.floating),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -146,8 +174,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(fontSize: 16, color: Colors.white)),
                 ),
                 const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => context.go('/register'),
+const Row(children: [
+  Expanded(child: Divider()),
+  Padding(
+    padding: EdgeInsets.symmetric(horizontal: 12),
+    child: Text('или', style: TextStyle(color: Colors.grey)),
+  ),
+  Expanded(child: Divider()),
+]),
+const SizedBox(height: 16),
+_GoogleSignInButton(onTap: _signInWithGoogle),
+const SizedBox(height: 16),
+TextButton(
+  onPressed: () => context.go('/register'),
                   child: Text(
                     'Нет аккаунта? Зарегистрироваться',
                     style: TextStyle(color: blue),
@@ -161,4 +200,32 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+class _GoogleSignInButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GoogleSignInButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.network(
+            'https://www.google.com/favicon.ico',
+            width: 20,
+            height: 20,
+          ),
+          const SizedBox(width: 12),
+          const Text('Войти через Google', style: TextStyle(fontSize: 15)),
+        ],
+      ),
+    );
+  }
+}
 }
