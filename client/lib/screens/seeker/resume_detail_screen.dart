@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import 'resume_edit_screen.dart';
 
 class ResumeDetailScreen extends StatefulWidget {
   final Map<String, dynamic> resume;
@@ -17,334 +15,409 @@ class ResumeDetailScreen extends StatefulWidget {
 
 class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
   late Map<String, dynamic> _resume;
+  bool _deleting = false;
   bool _scoring = false;
-  bool _downloading = false;
-  bool _initialized = false;
-
-  // Salary estimate state
-  Map<String, dynamic>? _salary;
-  bool _salaryLoading = false;
-
-  // Profile photo
-  String? _profilePhotoUrl;
+  bool _settingMain = false;
 
   @override
   void initState() {
     super.initState();
-    _resume = widget.resume;
+    _resume = Map<String, dynamic>.from(widget.resume);
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_initialized) {
-      _initialized = true;
-      _loadProfilePhoto();
-    }
-  }
-
-  Future<void> _loadProfilePhoto() async {
+  Future<void> _refresh() async {
+    // Reload resume from server
     try {
-      final token = context.read<AuthProvider>().token;
-      if (token == null) return;
-      final data = await ApiService.getSeekerProfile(token);
-      final p = data['profile'] as Map<String, dynamic>?;
-      if (mounted && p != null) {
-        setState(() => _profilePhotoUrl = p['photoUrl'] as String?);
-      }
-    } catch (_) {}
-  }
-
-  Map<String, dynamic> get _content {
-    final c = _resume['content'];
-    if (c is Map<String, dynamic>) return c;
-    return {};
-  }
-
-  Future<void> _getSalaryEstimate() async {
-    setState(() => _salaryLoading = true);
-    try {
-      final token = context.read<AuthProvider>().token!;
-      final result =
-          await ApiService.aiSalaryEstimate(token, _resume['id'] as String);
-      if (mounted) setState(() => _salary = result);
-    } catch (e) {
-      if (mounted) _showError(e.toString());
-    } finally {
-      if (mounted) setState(() => _salaryLoading = false);
-    }
-  }
-
-  Future<void> _getScore() async {
-    setState(() => _scoring = true);
-    try {
-      final token = context.read<AuthProvider>().token!;
-      final updated =
-          await ApiService.scoreResume(token, _resume['id'] as String);
+      final auth = context.read<AuthProvider>();
+      final list = await auth.withAuth((t) => ApiService.getResumes(t));
+      final updated = (list as List).cast<Map<String, dynamic>>().firstWhere(
+        (r) => r['id'] == _resume['id'],
+        orElse: () => _resume,
+      );
       if (mounted) setState(() => _resume = updated);
-    } catch (e) {
-      if (mounted) _showError(e.toString());
-    } finally {
-      if (mounted) setState(() => _scoring = false);
-    }
-  }
-
-  Future<void> _downloadPdf() async {
-    setState(() => _downloading = true);
-    try {
-      final token = context.read<AuthProvider>().token!;
-      final bytes =
-          await ApiService.downloadResumePdf(token, _resume['id'] as String);
-
-      final dir = await getApplicationDocumentsDirectory();
-      final safeTitle = (_resume['title'] as String? ?? 'resume')
-          .replaceAll(RegExp(r'[^\w\s-]'), '')
-          .trim()
-          .replaceAll(' ', '_');
-      final file =
-          File('${dir.path}/${safeTitle}_${_resume['id']}.pdf');
-      await file.writeAsBytes(bytes);
-
-      if (!mounted) return;
-      await OpenFilex.open(file.path);
-    } catch (e) {
-      if (mounted) _showError(e.toString());
-    } finally {
-      if (mounted) setState(() => _downloading = false);
-    }
+    } catch (_) {}
   }
 
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Удалить резюме?'),
         content: const Text('Это действие нельзя отменить.'),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена')),
-          TextButton(
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('Удалить', style: TextStyle(color: Colors.red)),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Удалить'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true) return;
 
+    setState(() => _deleting = true);
     try {
-      final token = context.read<AuthProvider>().token!;
-      await ApiService.deleteResume(token, _resume['id'] as String);
+      final auth = context.read<AuthProvider>();
+      await auth.withAuth((t) => ApiService.deleteResume(t, _resume['id'] as String));
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) _showError('Ошибка удаления: $e');
+      _showSnack('Ошибка: $e');
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg.replaceFirst('Exception: ', '')),
-      backgroundColor: Theme.of(context).colorScheme.error,
-    ));
+  Future<void> _score() async {
+    setState(() => _scoring = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      await auth.withAuth((t) => ApiService.scoreResume(t, _resume['id'] as String));
+      await _refresh();
+      _showSnack('✅ Оценка обновлена!');
+    } catch (e) {
+      _showSnack('Ошибка: $e');
+    } finally {
+      if (mounted) setState(() => _scoring = false);
+    }
+  }
+
+  Future<void> _setMain() async {
+    setState(() => _settingMain = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      await auth.withAuth((t) => ApiService.setMainResume(t, _resume['id'] as String));
+      if (mounted) {
+        setState(() => _resume['isMain'] = true);
+        _showSnack('✅ Резюме установлено как основное');
+      }
+    } catch (e) {
+      _showSnack('Ошибка: $e');
+    } finally {
+      if (mounted) setState(() => _settingMain = false);
+    }
+  }
+
+  Future<void> _edit() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => ResumeEditScreen(resume: _resume)),
+    );
+    if (updated == true) await _refresh();
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final score = _resume['aiScore'];
-    final isAi = _resume['isAiGenerated'] as bool? ?? false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final content = (_resume['content'] as Map<String, dynamic>?) ?? {};
     final skills = (_resume['skills'] as List?)?.cast<String>() ?? [];
+    final isMain = _resume['isMain'] as bool? ?? false;
+    final isAi = _resume['isAiGenerated'] as bool? ?? false;
+    final photoUrl = _resume['photoUrl'] as String?;
+    final score = content['aiScore'];
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerLowest,
-      appBar: AppBar(
-        title: Text(
-          _resume['title'] as String? ?? 'Резюме',
-          style: const TextStyle(fontSize: 17),
-          overflow: TextOverflow.ellipsis,
-        ),
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
-        elevation: 0,
-        surfaceTintColor: cs.surface,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.delete_outline_rounded,
-                color: cs.error),
-            onPressed: _delete,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ── Seeker photo + badges ─────────────────────────────────────────
-          _buildHeaderCard(cs, isAi, skills),
-          const SizedBox(height: 12),
-
-          // ── Score card ────────────────────────────────────────────────────
-          _buildScoreCard(cs, score),
-          const SizedBox(height: 12),
-
-          // ── Salary estimate card ──────────────────────────────────────────
-          _buildSalaryCard(cs),
-          const SizedBox(height: 12),
-
-          // ── PDF Download ──────────────────────────────────────────────────
-          _buildPdfButton(cs),
-          const SizedBox(height: 12),
-
-          // ── Content sections ──────────────────────────────────────────────
-          if ((_content['summary'] as String? ?? '').isNotEmpty) ...[
-            _buildSection(cs,
-                icon: Icons.person_outline_rounded,
-                title: 'О себе',
-                child: _text(cs, _content['summary'] as String)),
-            const SizedBox(height: 12),
-          ],
-
-          if ((_content['experience'] as String? ?? '').isNotEmpty) ...[
-            _buildSection(cs,
-                icon: Icons.work_outline_rounded,
-                title: 'Опыт работы',
-                child: _text(cs, _content['experience'] as String)),
-            const SizedBox(height: 12),
-          ],
-
-          if ((_content['education'] as String? ?? '').isNotEmpty) ...[
-            _buildSection(cs,
-                icon: Icons.school_outlined,
-                title: 'Образование',
-                child: _text(cs, _content['education'] as String)),
-            const SizedBox(height: 12),
-          ],
-
-          if ((_content['languages'] as String? ?? '').isNotEmpty) ...[
-            _buildSection(cs,
-                icon: Icons.language_rounded,
-                title: 'Языки',
-                child: _text(cs, _content['languages'] as String)),
-            const SizedBox(height: 12),
-          ],
-
-          if ((_content['additional'] as String? ?? '').isNotEmpty) ...[
-            _buildSection(cs,
-                icon: Icons.info_outline_rounded,
-                title: 'Дополнительно',
-                child: _text(cs, _content['additional'] as String)),
-            const SizedBox(height: 12),
-          ],
-
-          if ((_content['rawText'] as String? ?? '').isNotEmpty &&
-              (_content['summary'] as String? ?? '').isEmpty) ...[
-            _buildSection(cs,
-                icon: Icons.article_outlined,
-                title: 'Текст резюме',
-                child: _text(cs, _content['rawText'] as String)),
-            const SizedBox(height: 12),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── Header card: photo + skills + badges ────────────────────────────────────
-
-  Widget _buildHeaderCard(
-      ColorScheme cs, bool isAi, List<String> skills) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Photo
-          CircleAvatar(
-            radius: 44,
-            backgroundColor: cs.surfaceContainerHighest,
-            backgroundImage: _profilePhotoUrl != null
-                ? NetworkImage(_profilePhotoUrl!)
-                : null,
-            child: _profilePhotoUrl == null
-                ? Icon(Icons.person_rounded,
-                    size: 44, color: cs.onSurfaceVariant)
-                : null,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _resume['title'] as String? ?? '',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: cs.onSurface),
-            textAlign: TextAlign.center,
-          ),
-
-          // Badges
-          if (isAi || _resume['pdfUrl'] != null) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                if (isAi)
-                  _badge(cs, '✨ ИИ-резюме', cs.primary,
-                      cs.primaryContainer),
-                if (_resume['pdfUrl'] != null)
-                  _badge(cs, 'PDF', Colors.orange.shade700,
-                      Colors.orange.shade50),
-              ],
+      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        slivers: [
+          // Header
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: cs.surface,
+            foregroundColor: cs.onSurface,
+            surfaceTintColor: cs.surface,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.edit_rounded),
+                onPressed: _edit,
+              ),
+              IconButton(
+                icon: _deleting
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                onPressed: _deleting ? null : _delete,
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      cs.primary.withValues(alpha: 0.15),
+                      cs.surface,
+                    ],
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 60),
+                    // Photo
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: cs.primaryContainer,
+                        border: Border.all(color: cs.primary, width: 3),
+                        image: photoUrl != null
+                            ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
+                            : null,
+                      ),
+                      child: photoUrl == null
+                          ? Icon(Icons.person_rounded, size: 50, color: cs.primary)
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _resume['title'] as String? ?? 'Резюме',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isAi) _chip('✨ ИИ', cs.primary, cs.primaryContainer),
+                        if (isMain) ...[
+                          const SizedBox(width: 6),
+                          _chip('⭐ Основное', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+                        ],
+                        if (score != null) ...[
+                          const SizedBox(width: 6),
+                          _chip('$score/100', _scoreColor(score), _scoreColor(score).withValues(alpha: 0.12)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
 
-          // Skills
-          if (skills.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: skills
-                  .map((s) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: cs.primaryContainer,
-                          borderRadius: BorderRadius.circular(20),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _actionBtn(
+                          cs,
+                          icon: Icons.star_rounded,
+                          label: isMain ? 'Основное' : 'Сделать основным',
+                          loading: _settingMain,
+                          onTap: isMain ? null : _setMain,
+                          active: isMain,
                         ),
-                        child: Text(s,
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onPrimaryContainer)),
-                      ))
-                  .toList(),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _actionBtn(
+                          cs,
+                          icon: Icons.auto_awesome_rounded,
+                          label: 'Оценить ИИ',
+                          loading: _scoring,
+                          onTap: _score,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Contacts
+                  if (_hasContacts(content)) ...[
+                    _buildSection(
+                      cs, isDark,
+                      title: 'Контакты',
+                      icon: Icons.contact_phone_rounded,
+                      child: Column(
+                        children: [
+                          if (content['phone'] != null && (content['phone'] as String).isNotEmpty)
+                            _infoRow(cs, Icons.phone_rounded, content['phone'] as String),
+                          if (content['city'] != null && (content['city'] as String).isNotEmpty)
+                            _infoRow(cs, Icons.location_on_rounded, content['city'] as String),
+                          if (content['email'] != null && (content['email'] as String).isNotEmpty)
+                            _infoRow(cs, Icons.email_rounded, content['email'] as String),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Summary
+                  if (_notEmpty(content['summary']))
+                    _buildTextSection(cs, isDark, 'О себе', Icons.person_rounded, content['summary'] as String),
+
+                  // Skills
+                  if (skills.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildSection(
+                      cs, isDark,
+                      title: 'Навыки',
+                      icon: Icons.psychology_rounded,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: skills.map((s) => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(s, style: TextStyle(fontSize: 13, color: cs.primary, fontWeight: FontWeight.w500)),
+                        )).toList(),
+                      ),
+                    ),
+                  ],
+
+                  // Experience
+                  if (_notEmpty(content['experience'])) ...[
+                    const SizedBox(height: 12),
+                    _buildTextSection(cs, isDark, 'Опыт работы', Icons.business_center_rounded, content['experience'] as String),
+                  ],
+
+                  // Education
+                  if (_notEmpty(content['education'])) ...[
+                    const SizedBox(height: 12),
+                    _buildTextSection(cs, isDark, 'Образование', Icons.school_rounded, content['education'] as String),
+                  ],
+
+                  // Languages
+                  if (_notEmpty(content['languages'])) ...[
+                    const SizedBox(height: 12),
+                    _buildTextSection(cs, isDark, 'Языки', Icons.language_rounded, content['languages'] as String),
+                  ],
+
+                  // AI Score details
+                  if (content['aiScoreSummary'] != null) ...[
+                    const SizedBox(height: 12),
+                    _buildSection(
+                      cs, isDark,
+                      title: 'Оценка ИИ',
+                      icon: Icons.auto_awesome_rounded,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (content['aiScoreSummary'] != null)
+                            Text(content['aiScoreSummary'] as String,
+                                style: TextStyle(fontSize: 13, color: cs.onSurface)),
+                          if (content['aiScoreStrengths'] != null) ...[
+                            const SizedBox(height: 10),
+                            Text('💪 Сильные стороны',
+                                style: TextStyle(fontWeight: FontWeight.w600, color: cs.primary)),
+                            const SizedBox(height: 4),
+                            ...(content['aiScoreStrengths'] as List).map((s) =>
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 3),
+                                child: Text('• $s', style: TextStyle(fontSize: 13, color: cs.onSurface)),
+                              )
+                            ),
+                          ],
+                          if (content['aiScoreImprovements'] != null) ...[
+                            const SizedBox(height: 10),
+                            Text('📈 Что улучшить',
+                                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.orange)),
+                            const SizedBox(height: 4),
+                            ...(content['aiScoreImprovements'] as List).map((s) =>
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 3),
+                                child: Text('• $s', style: TextStyle(fontSize: 13, color: cs.onSurface)),
+                              )
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 40),
+                ],
+              ),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  // ── Score card ──────────────────────────────────────────────────────────────
+  bool _notEmpty(dynamic val) => val != null && (val as String).isNotEmpty;
+  bool _hasContacts(Map<String, dynamic> content) {
+    return _notEmpty(content['phone']) || _notEmpty(content['city']) || _notEmpty(content['email']);
+  }
 
-  Widget _buildScoreCard(ColorScheme cs, dynamic score) {
+  Widget _actionBtn(ColorScheme cs, {
+    required IconData icon,
+    required String label,
+    bool loading = false,
+    VoidCallback? onTap,
+    bool active = false,
+  }) {
+    return Material(
+      color: active ? cs.primary : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (loading)
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: active ? cs.onPrimary : cs.primary))
+              else
+                Icon(icon, size: 18, color: active ? cs.onPrimary : cs.primary),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: active ? cs.onPrimary : cs.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection(ColorScheme cs, bool isDark, {
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -355,274 +428,11 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome_rounded,
-                  color: cs.primary, size: 20),
-              const SizedBox(width: 8),
-              Text('Оценка резюме от ИИ',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: cs.onSurface)),
-              const Spacer(),
-              if (score != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _scoreColor(score).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$score / 100',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _scoreColor(score),
-                        fontSize: 15),
-                  ),
-                ),
+              Icon(icon, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.primary)),
             ],
           ),
-          // Strengths / Improvements from aiScoreDetails
-          if (score != null) ...[
-            _buildScoreDetails(cs),
-          ],
-          if (score == null) ...[
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _scoring ? null : _getScore,
-              icon: _scoring
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.stars_rounded, size: 18),
-              label: Text(_scoring ? 'Анализирую...' : 'Получить оценку'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoreDetails(ColorScheme cs) {
-    final content = _resume['content'];
-    if (content is! Map<String, dynamic>) return const SizedBox.shrink();
-
-    final summary = content['aiScoreSummary'] as String?;
-    final strengths =
-        (content['aiScoreStrengths'] as List?)?.cast<String>() ?? [];
-    final improvements =
-        (content['aiScoreImprovements'] as List?)?.cast<String>() ?? [];
-
-    if (summary == null && strengths.isEmpty && improvements.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (summary != null && summary.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(summary,
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-        ],
-        if (strengths.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text('Сильные стороны:',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF16A34A))),
-          ...strengths.map((s) => Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Row(children: [
-                  const Icon(Icons.check_circle_outline,
-                      size: 14, color: Color(0xFF16A34A)),
-                  const SizedBox(width: 6),
-                  Expanded(
-                      child: Text(s,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF16A34A)))),
-                ]),
-              )),
-        ],
-        if (improvements.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text('Что улучшить:',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: cs.error)),
-          ...improvements.map((s) => Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Row(children: [
-                  Icon(Icons.arrow_circle_up_outlined,
-                      size: 14, color: cs.error),
-                  const SizedBox(width: 6),
-                  Expanded(
-                      child: Text(s,
-                          style: TextStyle(
-                              fontSize: 12, color: cs.error))),
-                ]),
-              )),
-        ],
-      ],
-    );
-  }
-
-  // ── Salary card ─────────────────────────────────────────────────────────────
-
-  Widget _buildSalaryCard(ColorScheme cs) {
-    const teal = Color(0xFF0D9488);
-    final salaryMin = _salary?['min'] as int?;
-    final salaryMax = _salary?['max'] as int?;
-    final currency = _salary?['currency'] as String? ?? 'UZS';
-    final explanation = _salary?['explanation'] as String?;
-
-    String rangeText = '';
-    if (salaryMin != null && salaryMax != null) {
-      rangeText =
-          '${salaryMin ~/ 1000000}–${salaryMax ~/ 1000000} млн $currency';
-    } else if (salaryMin != null) {
-      rangeText = 'от ${salaryMin ~/ 1000000} млн $currency';
-    } else if (salaryMax != null) {
-      rangeText = 'до ${salaryMax ~/ 1000000} млн $currency';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            const Icon(Icons.payments_outlined, color: teal, size: 20),
-            const SizedBox(width: 8),
-            Text('Рыночная зарплата',
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: cs.onSurface)),
-            const Spacer(),
-            if (rangeText.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: teal.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(rangeText,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: teal,
-                        fontSize: 13)),
-              ),
-          ]),
-          if (explanation != null && explanation.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(explanation,
-                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-          ],
-          if (_salary == null) ...[
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _salaryLoading ? null : _getSalaryEstimate,
-              icon: _salaryLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.query_stats_rounded, size: 18),
-              label: Text(_salaryLoading
-                  ? 'Анализирую рынок...'
-                  : 'Узнать рыночную зарплату'),
-              style: FilledButton.styleFrom(
-                backgroundColor: teal,
-                minimumSize: const Size.fromHeight(44),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── PDF download button ──────────────────────────────────────────────────────
-
-  Widget _buildPdfButton(ColorScheme cs) {
-    return OutlinedButton.icon(
-      onPressed: _downloading ? null : _downloadPdf,
-      icon: _downloading
-          ? SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: cs.primary))
-          : const Icon(Icons.picture_as_pdf_rounded),
-      label: Text(
-          _downloading ? 'Генерирую PDF...' : 'Скачать PDF',
-          style: const TextStyle(fontWeight: FontWeight.w600)),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        side: BorderSide(color: cs.primary),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-
-  Widget _buildSection(ColorScheme cs,
-      {required IconData icon,
-      required String title,
-      required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(icon, size: 18, color: cs.primary),
-            const SizedBox(width: 8),
-            Text(title,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: cs.onSurfaceVariant)),
-          ]),
           const SizedBox(height: 10),
           child,
         ],
@@ -630,33 +440,38 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
     );
   }
 
-  Widget _text(ColorScheme cs, String value) => Text(
-        value,
-        style: TextStyle(
-            fontSize: 14, color: cs.onSurface, height: 1.5),
-      );
+  Widget _buildTextSection(ColorScheme cs, bool isDark, String title, IconData icon, String text) {
+    return _buildSection(cs, isDark, title: title, icon: icon,
+      child: Text(text, style: TextStyle(fontSize: 13, color: cs.onSurface, height: 1.5)),
+    );
+  }
 
-  Widget _badge(
-      ColorScheme cs, String label, Color textColor, Color bgColor) {
+  Widget _infoRow(ColorScheme cs, IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: cs.primary),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 13, color: cs.onSurface))),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, Color textColor, Color bgColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: textColor)),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(20)),
+      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor)),
     );
   }
 
   Color _scoreColor(dynamic score) {
     final n = score is int ? score : int.tryParse('$score') ?? 0;
     if (n >= 80) return const Color(0xFF16A34A);
-    if (n >= 60) return Theme.of(context).colorScheme.primary;
+    if (n >= 60) return const Color(0xFF2563EB);
     if (n >= 40) return Colors.orange;
-    return Theme.of(context).colorScheme.error;
+    return Colors.red;
   }
 }

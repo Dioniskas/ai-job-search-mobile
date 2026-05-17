@@ -443,3 +443,33 @@ export async function deleteResume(req: AuthRequest, res: Response): Promise<voi
   await prisma.resume.delete({ where: { id } });
   ok(res, { deleted: true });
 }
+
+// POST /api/resume/:id/photo
+export async function uploadResumePhoto(req: AuthRequest, res: Response): Promise<void> {
+  if (!req.file) { fail(res, 'No photo provided'); return; }
+
+  const { id } = req.params;
+  const profile = await prisma.seekerProfile.findUnique({
+    where: { userId: req.user!.userId },
+  });
+  if (!profile) { fail(res, 'Profile not found', 404); return; }
+
+  const existing = await prisma.resume.findFirst({
+    where: { id, seekerId: profile.id },
+  });
+  if (!existing) { fail(res, 'Resume not found', 404); return; }
+
+  const photoUrl = await uploadBuffer(
+    req.file.buffer,
+    req.file.mimetype,
+    'ai-job-search/resume-photos',
+    `photo-${id}-${Date.now()}`
+  );
+
+  const resume = await prisma.resume.update({
+    where: { id },
+    data: { photoUrl },
+  });
+
+  ok(res, { photoUrl: resume.photoUrl });
+}

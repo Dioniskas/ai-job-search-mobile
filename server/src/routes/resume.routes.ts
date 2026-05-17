@@ -3,6 +3,7 @@ import { authenticate, requireRole } from '../middleware/auth.middleware';
 import { uploadPdf, uploadAudio } from '../middleware/upload.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { generateResumeTextSchema } from '../validation/schemas';
+import { ..., uploadResumePhoto } from '../controllers/resume.controller';
 import {
   getResumes,
   uploadPdf as uploadPdfCtrl,
@@ -30,5 +31,7 @@ router.post('/:id/score',              scoreResumeCtrl);
 router.put('/:id/main',                setMainResume);
 router.put('/:id',                     updateResume);
 router.delete('/:id',                  deleteResume);
+router.post('/:id/photo', auth, upload.single('photo'), uploadResumePhoto);
+
 
 export default router;
