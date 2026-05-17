@@ -31,9 +31,19 @@ const PORT = process.env.PORT ?? 5000;
 
 app.set('trust proxy', 1);
 
+// ── CORS — должен быть ПЕРВЫМ до helmet ──────────────────────────────────────
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
+app.options('*', cors());
+
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images from ImageKit
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: false,
 }));
 
 // ── Rate limiting: 100 req/min per IP ────────────────────────────────────────
@@ -45,14 +55,6 @@ const limiter = rateLimit({
   message: { success: false, error: 'Слишком много запросов. Попробуйте позже.' },
 });
 app.use(limiter);
-
-// ── CORS ──────────────────────────────────────────────────────────────────────
-// Mobile clients connect from real devices with no fixed origin,
-// so we allow all origins in dev. Restrict to a domain in production via CLIENT_URL env.
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
 
 app.use(express.json({ limit: '2mb' }));
 
