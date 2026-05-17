@@ -22,6 +22,8 @@ import emailNotificationsRoutes from './routes/email-notifications.routes';
 import adminRoutes from './routes/admin.routes';
 import reportRoutes from './routes/report.routes';
 import paymentRoutes from './routes/payment.routes';
+import googleAuthRoutes from './routes/google-auth.routes';
+
 
 const app = express();
 const httpServer = createServer(app);
@@ -56,6 +58,7 @@ app.use(cors({
 app.use(express.json({ limit: '2mb' }));
 
 app.use('/api/auth',          authRoutes);
+app.use('/api/auth/google', googleAuthRoutes);
 app.use('/api/seeker',        seekerRoutes);
 app.use('/api/employer',      employerRoutes);
 app.use('/api/resume',        resumeRoutes);
@@ -73,6 +76,7 @@ app.use('/api/chat',                       chatRoutes);
 app.use('/api/admin',                      adminRoutes);
 app.use('/api/reports',                    reportRoutes);
 app.use('/api/payments',                   paymentRoutes);
+
 
 app.get('/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
