@@ -198,6 +198,23 @@ class ApiService {
   return _parsePublic(response);
 }
 
+static Future<Map<String, dynamic>> updateResume(String token, String id, Map<String, dynamic> data) async {
+  final response = await _safePut(
+    Uri.parse('$baseUrl/api/resume/$id'),
+    headers: _headers(token: token),
+    body: json.encode(data),
+  );
+  return _parse(response);
+}
+
+static Future<void> uploadResumePhoto(String token, String resumeId, File photo) async {
+  final uri = Uri.parse('$baseUrl/api/resume/$resumeId/photo');
+  final request = http.MultipartRequest('POST', uri);
+  request.headers['Authorization'] = 'Bearer $token';
+  request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
+  await request.send();
+}
+
   static Future<Map<String, dynamic>> register(
       String email, String password, String role) async {
     final response = await _safePost(
@@ -502,14 +519,7 @@ class ApiService {
     _parse(response);
   }
 
-  static Future<void> uploadResumePhoto(String token, String resumeId, File photo) async {
-  final uri = Uri.parse('$baseUrl/api/resume/$resumeId/photo');
-  final request = http.MultipartRequest('POST', uri);
-  request.headers['Authorization'] = 'Bearer $token';
-  request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
-  await request.send();
-}
-
+ 
 static Future<Map<String, dynamic>> aiImproveResumeText(String token, {
   required String title,
   required String summary,

@@ -45,31 +45,32 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
-  try {
-    final googleSignIn = GoogleSignIn(
-      clientId: '310538934424-3282vr0l4eciq6upttgk19948slu5ta7.apps.googleusercontent.com',
-    );
-    final account = await googleSignIn.signIn();
-    if (account == null) return;
-    final auth = await account.authentication;
-    final idToken = auth.idToken;
-    if (idToken == null) throw Exception('No idToken');
-    if (!mounted) return;
-    final error = await context.read<AuthProvider>().loginWithGoogle(idToken);
-if (error != null && mounted) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
-  );
-  return;
-}
-    if (!mounted) return;
-    context.go('/');
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Ошибка: $e'), behavior: SnackBarBehavior.floating),
-    );
+    try {
+      final googleSignIn = GoogleSignIn(
+        serverClientId: '685871848467-m1ef595poflafe15a836ibrj3hfejbjq.apps.googleusercontent.com',
+      );
+      final account = await googleSignIn.signIn();
+      if (account == null) return;
+      final auth = await account.authentication;
+      final idToken = auth.idToken;
+      if (idToken == null) throw Exception('No idToken');
+      if (!mounted) return;
+      final error = await context.read<AuthProvider>().loginWithGoogle(idToken);
+      if (error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), behavior: SnackBarBehavior.floating),
+        );
+        return;
+      }
+      if (!mounted) return;
+      context.go('/');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: $e'), behavior: SnackBarBehavior.floating),
+      );
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -193,13 +194,15 @@ TextButton(
                   ),
                 ),
                 const SizedBox(height: 24),
-              ],
+ ],
             ),
           ),
         ),
       ),
     );
   }
+}
+
 class _GoogleSignInButton extends StatelessWidget {
   final VoidCallback onTap;
   const _GoogleSignInButton({required this.onTap});
@@ -227,5 +230,4 @@ class _GoogleSignInButton extends StatelessWidget {
       ),
     );
   }
-}
 }

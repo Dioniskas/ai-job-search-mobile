@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:685871848467:android:c38b808395f254a605f3e6",
+        "android_client_info": {
+          "package_name": "com.aijobsearch.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCD1sFv4fG0RYmDs_otwvEwqSIhqq_WAwo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:685871848467:android:df6059bd270ce26e05f3e6",
         "android_client_info": {
           "package_name": "com.android.application"

@@ -49,9 +49,8 @@ app.use(limiter);
 // ── CORS ──────────────────────────────────────────────────────────────────────
 // Mobile clients connect from real devices with no fixed origin,
 // so we allow all origins in dev. Restrict to a domain in production via CLIENT_URL env.
-const allowedOrigin = process.env.CLIENT_URL;
 app.use(cors({
-  origin: allowedOrigin ? allowedOrigin : true,
+  origin: true,
   credentials: true,
 }));
 
