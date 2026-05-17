@@ -1,99 +1,194 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_sound/flutter_sound.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import 'resume_detail_screen.dart';
 
-const _blue = Color(0xFF2563EB);
-const _bg = Color(0xFFF8FAFC);
-const _textPrimary = Color(0xFF0F172A);
-const _textSecondary = Color(0xFF64748B);
+// ── Main choice screen ───────────────────────────────────────────────────────
 
-class ResumeCreateScreen extends StatefulWidget {
+class ResumeCreateScreen extends StatelessWidget {
   const ResumeCreateScreen({super.key});
 
   @override
-  State<ResumeCreateScreen> createState() => _ResumeCreateScreenState();
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('Создать резюме'),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
+        elevation: 0,
+        surfaceTintColor: cs.surface,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          Text(
+            'Как создать резюме?',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Выберите удобный способ',
+            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 20),
+          _MethodCard(
+            icon: Icons.upload_file_rounded,
+            title: 'Загрузить PDF',
+            subtitle: 'Уже есть готовое резюме',
+            color: const Color(0xFF2563EB),
+            onTap: () => _push(context, const _UploadPdfScreen(improve: false)),
+          ),
+          _MethodCard(
+            icon: Icons.auto_awesome_rounded,
+            title: 'PDF + Ассистент',
+            subtitle: 'Загрузи PDF, Ассистент улучшит',
+            color: const Color(0xFF7C3AED),
+            onTap: () => _push(context, const _UploadPdfScreen(improve: true)),
+          ),
+          _MethodCard(
+            icon: Icons.edit_note_rounded,
+            title: 'Заполнить форму',
+            subtitle: 'Ассистент составит резюме',
+            color: const Color(0xFF0891B2),
+            onTap: () => _push(context, const _FormScreen()),
+          ),
+          _MethodCard(
+            icon: Icons.mic_rounded,
+            title: 'Голосом',
+            subtitle: 'Расскажи о себе, Ассистент оформит',
+            color: const Color(0xFF16A34A),
+            onTap: () => _push(context, const _VoiceScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _push(BuildContext context, Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 }
 
-class _ResumeCreateScreenState extends State<ResumeCreateScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabCtrl;
+// ── Choice card ───────────────────────────────────────────────────────────────
 
-  @override
-  void initState() {
-    super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
-  }
+class _MethodCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
 
-  @override
-  void dispose() {
-    _tabCtrl.dispose();
-    super.dispose();
-  }
+  const _MethodCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        title: const Text('Создать резюме'),
-        backgroundColor: Colors.white,
-        foregroundColor: _textPrimary,
-        elevation: 0,
-        surfaceTintColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabCtrl,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelColor: _blue,
-          unselectedLabelColor: _textSecondary,
-          indicatorColor: _blue,
-          tabs: const [
-            Tab(text: '📄 Загрузить PDF'),
-            Tab(text: '✨ PDF + ИИ'),
-            Tab(text: '📝 Из формы'),
-            Tab(text: '🎤 Из голоса'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabCtrl,
-        children: const [
-          _UploadPdfTab(improve: false),
-          _UploadPdfTab(improve: true),
-          _FormTab(),
-          _VoiceTab(),
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: color, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
-// ── Helper ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 void _openDetail(BuildContext context, Map<String, dynamic> resume) {
   Navigator.pushReplacement(
     context,
-    MaterialPageRoute(
-      builder: (_) => ResumeDetailScreen(resume: resume),
-    ),
+    MaterialPageRoute(builder: (_) => ResumeDetailScreen(resume: resume)),
   );
 }
 
-Widget _buildCard({required Widget child}) {
+Widget _buildCard({required Widget child, required BuildContext context}) {
+  final cs = Theme.of(context).colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     margin: const EdgeInsets.all(16),
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: cs.surface,
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
+          color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
           blurRadius: 8,
           offset: const Offset(0, 2),
         ),
@@ -103,41 +198,41 @@ Widget _buildCard({required Widget child}) {
   );
 }
 
-Widget _submitButton(
-    {required VoidCallback? onPressed,
-    required bool loading,
-    required String label,
-    required IconData icon}) {
+Widget _submitButton({
+  required VoidCallback? onPressed,
+  required bool loading,
+  required String label,
+  required IconData icon,
+}) {
   return FilledButton.icon(
     onPressed: onPressed,
     icon: loading
         ? const SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: Colors.white))
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+          )
         : Icon(icon, size: 18),
     label: Text(label),
     style: FilledButton.styleFrom(
-      backgroundColor: _blue,
+      backgroundColor: const Color(0xFF2563EB),
       minimumSize: const Size.fromHeight(52),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
 }
 
-// ── Tab 1 & 2: PDF upload ───────────────────────────────────────────────────
+// ── Screen 1 & 2: PDF upload ─────────────────────────────────────────────────
 
-class _UploadPdfTab extends StatefulWidget {
+class _UploadPdfScreen extends StatefulWidget {
   final bool improve;
-  const _UploadPdfTab({required this.improve});
+  const _UploadPdfScreen({required this.improve});
 
   @override
-  State<_UploadPdfTab> createState() => _UploadPdfTabState();
+  State<_UploadPdfScreen> createState() => _UploadPdfScreenState();
 }
 
-class _UploadPdfTabState extends State<_UploadPdfTab> {
+class _UploadPdfScreenState extends State<_UploadPdfScreen> {
   String? _filePath;
   String? _fileName;
   bool _loading = false;
@@ -170,8 +265,7 @@ class _UploadPdfTabState extends State<_UploadPdfTab> {
       if (mounted) _openDetail(context, resume);
     } catch (e) {
       if (mounted) {
-        setState(() =>
-            _error = e.toString().replaceFirst('Exception: ', ''));
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -180,126 +274,136 @@ class _UploadPdfTabState extends State<_UploadPdfTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Icon(
-                  widget.improve
-                      ? Icons.auto_awesome_rounded
-                      : Icons.upload_file_rounded,
-                  size: 48,
-                  color: _blue,
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Text(widget.improve ? 'PDF + Ассистент' : 'Загрузить PDF'),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
+        elevation: 0,
+        surfaceTintColor: cs.surface,
+      ),
+      body: SingleChildScrollView(
+        child: _buildCard(
+          context: context,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(
+                widget.improve
+                    ? Icons.auto_awesome_rounded
+                    : Icons.upload_file_rounded,
+                size: 48,
+                color: cs.primary,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                widget.improve
+                    ? 'Ассистент улучшит ваше резюме'
+                    : 'Загрузите готовое резюме',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurface,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.improve
-                      ? 'ИИ улучшит ваше резюме'
-                      : 'Загрузите готовое резюме',
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: _textPrimary),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  widget.improve
-                      ? 'Искусственный интеллект структурирует и улучшит текст вашего PDF-резюме'
-                      : 'Загрузите PDF-файл резюме — он будет сохранён в системе',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: _textSecondary, fontSize: 14),
-                ),
-                const SizedBox(height: 24),
-                GestureDetector(
-                  onTap: _pickFile,
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _bg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                widget.improve
+                    ? 'Ассистент структурирует и улучшит текст вашего PDF-резюме'
+                    : 'Загрузите PDF-файл резюме — он будет сохранён в системе',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: _pickFile,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? cs.surfaceContainerHighest
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _fileName != null
+                          ? cs.primary
+                          : cs.outlineVariant,
+                      width: _fileName != null ? 2 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _fileName != null
+                            ? Icons.picture_as_pdf_rounded
+                            : Icons.cloud_upload_outlined,
+                        size: 40,
                         color: _fileName != null
-                            ? _blue
-                            : const Color(0xFFE2E8F0),
-                        width: _fileName != null ? 2 : 1,
+                            ? cs.primary
+                            : cs.onSurfaceVariant,
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          _fileName != null
-                              ? Icons.picture_as_pdf_rounded
-                              : Icons.cloud_upload_outlined,
-                          size: 40,
+                      const SizedBox(height: 8),
+                      Text(
+                        _fileName ?? 'Нажмите, чтобы выбрать PDF',
+                        style: TextStyle(
                           color: _fileName != null
-                              ? _blue
-                              : const Color(0xFF94A3B8),
+                              ? cs.primary
+                              : cs.onSurfaceVariant,
+                          fontWeight: _fileName != null
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _fileName ?? 'Нажмите, чтобы выбрать PDF',
-                          style: TextStyle(
-                            color: _fileName != null
-                                ? _blue
-                                : _textSecondary,
-                            fontWeight: _fileName != null
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(_error!,
-                        style:
-                            const TextStyle(color: Color(0xFFDC2626))),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-                const SizedBox(height: 16),
-                _submitButton(
-                  onPressed: (_filePath == null || _loading) ? null : _submit,
-                  loading: _loading,
-                  label: widget.improve
-                      ? 'Улучшить с ИИ'
-                      : 'Загрузить резюме',
-                  icon: widget.improve
-                      ? Icons.auto_awesome_rounded
-                      : Icons.upload_rounded,
+                  child: Text(_error!, style: TextStyle(color: cs.error)),
                 ),
               ],
-            ),
+              const SizedBox(height: 16),
+              _submitButton(
+                onPressed: (_filePath == null || _loading) ? null : _submit,
+                loading: _loading,
+                label: widget.improve
+                    ? 'Улучшить с Ассистентом'
+                    : 'Загрузить резюме',
+                icon: widget.improve
+                    ? Icons.auto_awesome_rounded
+                    : Icons.upload_rounded,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ── Tab 3: Form ──────────────────────────────────────────────────────────────
+// ── Screen 3: Form ────────────────────────────────────────────────────────────
 
-class _FormTab extends StatefulWidget {
-  const _FormTab();
+class _FormScreen extends StatefulWidget {
+  const _FormScreen();
 
   @override
-  State<_FormTab> createState() => _FormTabState();
+  State<_FormScreen> createState() => _FormScreenState();
 }
 
-class _FormTabState extends State<_FormTab> {
+class _FormScreenState extends State<_FormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
@@ -332,14 +436,12 @@ class _FormTabState extends State<_FormTab> {
         if (_ageCtrl.text.trim().isNotEmpty) 'age': _ageCtrl.text.trim(),
         'experience': _expCtrl.text.trim(),
         'skills': _skillsCtrl.text.trim(),
-        if (_aboutCtrl.text.trim().isNotEmpty)
-          'about': _aboutCtrl.text.trim(),
+        if (_aboutCtrl.text.trim().isNotEmpty) 'about': _aboutCtrl.text.trim(),
       });
       if (mounted) _openDetail(context, resume);
     } catch (e) {
       if (mounted) {
-        setState(() =>
-            _error = e.toString().replaceFirst('Exception: ', ''));
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -348,66 +450,106 @@ class _FormTabState extends State<_FormTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Form(
-        key: _formKey,
-        child: _buildCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.edit_note_rounded,
-                  size: 40, color: _blue),
-              const SizedBox(height: 8),
-              const Text(
-                'ИИ составит резюме по вашим данным',
-                style: TextStyle(
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('Заполнить форму'),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
+        elevation: 0,
+        surfaceTintColor: cs.surface,
+      ),
+      body: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: _buildCard(
+            context: context,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(Icons.edit_note_rounded, size: 40, color: cs.primary),
+                const SizedBox(height: 8),
+                Text(
+                  'Ассистент составит резюме по вашим данным',
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: _textPrimary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              _field(_nameCtrl, 'Имя и фамилия *',
+                    color: cs.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Заполните поля — Ассистент создаст профессиональное резюме',
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                _field(
+                  context,
+                  _nameCtrl,
+                  'Имя и фамилия',
                   Icons.person_outline_rounded,
-                  required: true),
-              _field(_ageCtrl, 'Возраст',
+                  required: true,
+                  hint: 'Например: Алексей Иванов',
+                ),
+                _field(
+                  context,
+                  _ageCtrl,
+                  'Возраст',
                   Icons.cake_outlined,
-                  keyboard: TextInputType.number),
-              _field(_expCtrl, 'Опыт работы *',
+                  keyboard: TextInputType.number,
+                  hint: 'Например: 28',
+                ),
+                _field(
+                  context,
+                  _expCtrl,
+                  'Опыт работы',
                   Icons.work_outline_rounded,
-                  maxLines: 4,
-                  hint: 'Опишите ваш опыт работы: компании, должности, достижения',
-                  required: true),
-              _field(_skillsCtrl, 'Навыки *',
+                  maxLines: 5,
+                  required: true,
+                  hint: 'Компания, должность, период, обязанности и достижения...',
+                ),
+                _field(
+                  context,
+                  _skillsCtrl,
+                  'Навыки',
                   Icons.psychology_rounded,
                   maxLines: 2,
-                  hint: 'Перечислите через запятую: Python, SQL, управление командой...',
-                  required: true),
-              _field(_aboutCtrl, 'О себе',
+                  required: true,
+                  hint: 'Flutter, Dart, Firebase, Git, REST API...',
+                ),
+                _field(
+                  context,
+                  _aboutCtrl,
+                  'О себе',
                   Icons.notes_rounded,
                   maxLines: 3,
-                  hint: 'Дополнительная информация о вас'),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(8),
+                  hint: 'Краткое описание вашего профессионального опыта...',
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cs.errorContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(_error!, style: TextStyle(color: cs.error)),
                   ),
-                  child: Text(_error!,
-                      style:
-                          const TextStyle(color: Color(0xFFDC2626))),
+                ],
+                const SizedBox(height: 8),
+                _submitButton(
+                  onPressed: _loading ? null : _submit,
+                  loading: _loading,
+                  label: 'Создать с Ассистентом',
+                  icon: Icons.auto_awesome_rounded,
                 ),
               ],
-              const SizedBox(height: 8),
-              _submitButton(
-                onPressed: _loading ? null : _submit,
-                loading: _loading,
-                label: 'Создать с ИИ',
-                icon: Icons.auto_awesome_rounded,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -415,6 +557,7 @@ class _FormTabState extends State<_FormTab> {
   }
 
   Widget _field(
+    BuildContext context,
     TextEditingController ctrl,
     String label,
     IconData icon, {
@@ -423,6 +566,8 @@ class _FormTabState extends State<_FormTab> {
     TextInputType keyboard = TextInputType.text,
     String? hint,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
@@ -430,36 +575,37 @@ class _FormTabState extends State<_FormTab> {
         maxLines: maxLines,
         keyboardType: keyboard,
         decoration: InputDecoration(
-          labelText: label,
+          labelText: required ? '$label *' : label,
           hintText: hint,
-          prefixIcon: Icon(icon, size: 20),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10)),
+          helperText: required ? 'Обязательное поле' : null,
+          prefixIcon: maxLines == 1 ? Icon(icon, size: 20) : null,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           filled: true,
-          fillColor: _bg,
+          fillColor: isDark
+              ? cs.surfaceContainerHighest
+              : const Color(0xFFF8FAFC),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
         validator: required
-            ? (v) => v == null || v.trim().isEmpty
-                ? 'Обязательное поле'
-                : null
+            ? (v) =>
+                v == null || v.trim().isEmpty ? 'Обязательное поле' : null
             : null,
       ),
     );
   }
 }
 
-// ── Tab 4: Voice ─────────────────────────────────────────────────────────────
+// ── Screen 4: Voice ───────────────────────────────────────────────────────────
 
-class _VoiceTab extends StatefulWidget {
-  const _VoiceTab();
+class _VoiceScreen extends StatefulWidget {
+  const _VoiceScreen();
 
   @override
-  State<_VoiceTab> createState() => _VoiceTabState();
+  State<_VoiceScreen> createState() => _VoiceScreenState();
 }
 
-class _VoiceTabState extends State<_VoiceTab> {
+class _VoiceScreenState extends State<_VoiceScreen> {
   FlutterSoundRecorder? _recorder;
   bool _isRecorderReady = false;
   bool _isRecording = false;
@@ -504,7 +650,6 @@ class _VoiceTabState extends State<_VoiceTab> {
       setState(() => _isRecording = false);
       return;
     }
-
     if (!_isRecorderReady) {
       await _initRecorder();
       if (!_isRecorderReady) {
@@ -517,16 +662,10 @@ class _VoiceTabState extends State<_VoiceTab> {
         return;
       }
     }
-
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-    await _recorder!.startRecorder(
-      toFile: path,
-      codec: Codec.aacMP4,
-    );
-
+    await _recorder!.startRecorder(toFile: path, codec: Codec.aacMP4);
     setState(() {
       _isRecording = true;
       _audioPath = path;
@@ -548,15 +687,14 @@ class _VoiceTabState extends State<_VoiceTab> {
       if (mounted) _openDetail(context, resume);
     } catch (e) {
       if (mounted) {
-        setState(() =>
-            _error = e.toString().replaceFirst('Exception: ', ''));
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  String _formatDuration(Duration d) {
+  String _fmt(Duration d) {
     final m = d.inMinutes.toString().padLeft(2, '0');
     final s = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
@@ -564,123 +702,193 @@ class _VoiceTabState extends State<_VoiceTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: _buildCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(Icons.mic_rounded, size: 48, color: _blue),
-            const SizedBox(height: 8),
-            const Text(
-              'Расскажите о себе голосом',
-              style: TextStyle(
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('Создать голосом'),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
+        elevation: 0,
+        surfaceTintColor: cs.surface,
+      ),
+      body: SingleChildScrollView(
+        child: _buildCard(
+          context: context,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(Icons.mic_rounded, size: 48, color: cs.primary),
+              const SizedBox(height: 8),
+              Text(
+                'Расскажите о себе голосом',
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: _textPrimary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'ИИ транскрибирует речь и составит профессиональное резюме',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: _textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 32),
-
-            // Recording button
-            Center(
-              child: GestureDetector(
-                onTap: _toggleRecording,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    color: _isRecording
-                        ? Colors.red.withValues(alpha: 0.1)
-                        : const Color(0xFFEFF6FF),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _isRecording ? Colors.red : _blue,
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                    size: 44,
-                    color: _isRecording ? Colors.red : _blue,
-                  ),
+                  color: cs.onSurface,
                 ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Timer / status
-            Center(
-              child: Text(
-                _isRecording
-                    ? '⏺ ${_formatDuration(_duration)}'
-                    : _audioPath != null
-                        ? '✅ Запись готова (${_formatDuration(_duration)})'
-                        : 'Нажмите, чтобы начать запись',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: _isRecording
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                  color: _isRecording ? Colors.red : _textSecondary,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                'Расскажите: имя, опыт работы (компании и должности), ключевые навыки, образование',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: _textSecondary),
               ),
-            ),
+              const SizedBox(height: 6),
+              Text(
+                'Ассистент транскрибирует речь и составит профессиональное резюме',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
 
-            if (_error != null) ...[
-              const SizedBox(height: 12),
+              // Tips
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(8),
+                  color: cs.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(_error!,
-                    style:
-                        const TextStyle(color: Color(0xFFDC2626))),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Расскажите о:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: cs.primary,
+                          fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    ...[
+                      'Имени и желаемой должности',
+                      'Опыте работы (компании, должности, достижения)',
+                      'Ключевых навыках и технологиях',
+                      'Образовании и курсах',
+                    ].map((tip) => Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(children: [
+                            Icon(Icons.check_circle_outline_rounded,
+                                size: 14, color: cs.primary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(tip,
+                                  style: TextStyle(
+                                      fontSize: 12, color: cs.onSurface)),
+                            ),
+                          ]),
+                        )),
+                  ],
+                ),
               ),
-            ],
+              const SizedBox(height: 28),
 
-            const SizedBox(height: 20),
-            _submitButton(
-              onPressed: (_audioPath == null || _isRecording || _loading)
-                  ? null
-                  : _submit,
-              loading: _loading,
-              label: 'Создать резюме из записи',
-              icon: Icons.auto_awesome_rounded,
-            ),
-
-            if (_audioPath != null && !_loading) ...[
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => setState(() {
-                  _audioPath = null;
-                  _duration = Duration.zero;
-                }),
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Записать заново'),
-                style: TextButton.styleFrom(foregroundColor: _textSecondary),
+              // Record button
+              Center(
+                child: GestureDetector(
+                  onTap: _loading ? null : _toggleRecording,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: _isRecording
+                          ? Colors.red.withValues(alpha: 0.12)
+                          : cs.primaryContainer.withValues(alpha: 0.5),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _isRecording ? Colors.red : cs.primary,
+                        width: 2.5,
+                      ),
+                    ),
+                    child: Icon(
+                      _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                      size: 46,
+                      color: _isRecording ? Colors.red : cs.primary,
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(height: 14),
+
+              // Status text
+              Center(
+                child: Text(
+                  _isRecording
+                      ? '● Запись: ${_fmt(_duration)}'
+                      : _audioPath != null
+                          ? 'Запись готова — ${_fmt(_duration)}'
+                          : 'Нажмите, чтобы начать запись',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight:
+                        _isRecording ? FontWeight.w600 : FontWeight.normal,
+                    color: _isRecording ? Colors.red : cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+
+              // Loading indicator
+              if (_loading) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: cs.primary),
+                      ),
+                      const SizedBox(width: 10),
+                      Text('Ассистент обрабатывает запись...',
+                          style: TextStyle(
+                              color: cs.primary, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(_error!, style: TextStyle(color: cs.error)),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+              _submitButton(
+                onPressed:
+                    (_audioPath == null || _isRecording || _loading)
+                        ? null
+                        : _submit,
+                loading: _loading,
+                label: 'Создать резюме из записи',
+                icon: Icons.auto_awesome_rounded,
+              ),
+              if (_audioPath != null && !_loading) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    _audioPath = null;
+                    _duration = Duration.zero;
+                  }),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Записать заново'),
+                  style: TextButton.styleFrom(
+                      foregroundColor: cs.onSurfaceVariant),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
