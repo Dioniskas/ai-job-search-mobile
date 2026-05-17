@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -18,6 +21,7 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
   bool _deleting = false;
   bool _scoring = false;
   bool _settingMain = false;
+  bool _downloadingPdf = false;
 
   @override
   void initState() {
@@ -105,6 +109,24 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
       MaterialPageRoute(builder: (_) => ResumeEditScreen(resume: _resume)),
     );
     if (updated == true) await _refresh();
+  }
+
+  Future<void> _downloadPdf() async {
+    setState(() => _downloadingPdf = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final bytes = await auth.withAuth(
+        (t) => ApiService.downloadResumePdf(t, _resume['id'] as String),
+      );
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/resume_${_resume['id']}.pdf');
+      await file.writeAsBytes(bytes);
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      _showSnack('Ошибка скачивания PDF: $e');
+    } finally {
+      if (mounted) setState(() => _downloadingPdf = false);
+    }
   }
 
   void _showSnack(String msg) {
@@ -228,7 +250,17 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
                           active: isMain,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _actionBtn(
+                          cs,
+                          icon: Icons.picture_as_pdf_rounded,
+                          label: 'Скачать PDF',
+                          loading: _downloadingPdf,
+                          onTap: _downloadPdf,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: _actionBtn(
                           cs,

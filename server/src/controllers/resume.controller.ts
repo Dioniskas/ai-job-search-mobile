@@ -345,81 +345,170 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
   });
   if (!resume) { fail(res, 'Resume not found', 404); return; }
 
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.userId },
+    select: { email: true },
+  });
+
   const content = (resume.content ?? {}) as Record<string, unknown>;
 
-  try {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const fontPath = findCyrillicFont();
+  // Download candidate photo if available
+  let photoBuffer: Buffer | null = null;
+  if (resume.photoUrl) {
+    try {
+      const resp = await fetch(resume.photoUrl);
+      if (resp.ok) photoBuffer = Buffer.from(await resp.arrayBuffer());
+    } catch { /* photo unavailable — skip */ }
+  }
 
-    if (fontPath) {
-      doc.registerFont('Main', fontPath);
-      doc.font('Main');
-    }
+  try {
+    const doc = new PDFDocument({ margin: 0, size: 'A4' });
+    const fontPath = findCyrillicFont();
+    if (fontPath) doc.registerFont('Cv', fontPath);
+    const setFont = () => { if (fontPath) doc.font('Cv'); return doc; };
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="resume-${id}.pdf"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
     doc.pipe(res);
 
-    // ── Header ────────────────────────────────────────────────────────────────
-    doc.fontSize(20).text(resume.title, { align: 'center' });
-    doc.moveDown(0.5);
+    const PAGE_W    = 595.28;
+    const MARGIN    = 44;
+    const CONTENT_W = PAGE_W - MARGIN * 2;
+    const PRIMARY   = '#2563EB';
+    const DARK      = '#0F172A';
+    const MID       = '#334155';
+    const MUTED     = '#64748B';
+    const DIVIDER   = '#E2E8F0';
 
-    const seekerName = `${profile.firstName} ${profile.lastName}`.trim();
+    // ── Top accent stripe ─────────────────────────────────────────────────────
+    doc.rect(0, 0, PAGE_W, 9).fill(PRIMARY);
+
+    // ── Header: photo left | name+title+contacts right ────────────────────────
+    const PHOTO_SIZE = 88;
+    const HEADER_Y   = 22;
+    const HAS_PHOTO  = !!photoBuffer;
+    const TEXT_X     = HAS_PHOTO ? MARGIN + PHOTO_SIZE + 18 : MARGIN;
+    const TEXT_W     = HAS_PHOTO ? CONTENT_W - PHOTO_SIZE - 18 : CONTENT_W;
+
+    if (HAS_PHOTO && photoBuffer) {
+      const cx = MARGIN + PHOTO_SIZE / 2;
+      const cy = HEADER_Y + PHOTO_SIZE / 2;
+      doc.save();
+      doc.circle(cx, cy, PHOTO_SIZE / 2).clip();
+      doc.image(photoBuffer, MARGIN, HEADER_Y, { width: PHOTO_SIZE, height: PHOTO_SIZE });
+      doc.restore();
+      doc.circle(cx, cy, PHOTO_SIZE / 2).lineWidth(2.5).strokeColor(PRIMARY).stroke();
+    }
+
+    let textY = HEADER_Y + 2;
+    const seekerName = `${profile.firstName ?? ''} ${profile.lastName ?? ''}`.trim();
+
     if (seekerName) {
-      doc.fontSize(13).text(seekerName, { align: 'center' });
-      doc.moveDown(0.3);
+      setFont().fontSize(20).fillColor(DARK)
+        .text(seekerName, TEXT_X, textY, { width: TEXT_W, lineBreak: false });
+      textY += 27;
     }
-    if (profile.city) {
-      doc.fontSize(11).fillColor('#64748B').text(profile.city, { align: 'center' });
-    }
-    if (profile.phone) {
-      doc.fontSize(11).fillColor('#64748B').text(profile.phone, { align: 'center' });
-    }
-    doc.fillColor('#000000');
-    doc.moveDown(0.8);
 
-    // ── Divider ───────────────────────────────────────────────────────────────
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#CBD5E1').stroke();
-    doc.moveDown(0.6);
+    setFont().fontSize(12).fillColor(PRIMARY)
+      .text(resume.title, TEXT_X, textY, { width: TEXT_W, lineBreak: false });
+    textY += 19;
 
-    // ── Section helper ────────────────────────────────────────────────────────
-    function section(title: string, body: string): void {
-      doc
-        .fontSize(12)
-        .fillColor('#1E3A8A')
-        .text(title.toUpperCase(), { underline: false });
-      doc
-        .fontSize(10)
-        .fillColor('#0F172A')
-        .text(body, { lineGap: 3 });
-      doc.moveDown(0.7);
+    const phone = (content['phone'] as string | undefined) || profile.phone || '';
+    const city  = (content['city']  as string | undefined) || profile.city  || '';
+    const email = (content['email'] as string | undefined) || user?.email   || '';
+    const contactParts: string[] = [];
+    if (phone) contactParts.push(phone);
+    if (city)  contactParts.push(city);
+    if (email) contactParts.push(email);
+    if (contactParts.length > 0) {
+      setFont().fontSize(9).fillColor(MUTED)
+        .text(contactParts.join('   |   '), TEXT_X, textY, { width: TEXT_W, lineBreak: false });
+      textY += 15;
+    }
+
+    const headerEndY = Math.max(textY + 10, HEADER_Y + PHOTO_SIZE + 14);
+    doc.moveTo(MARGIN, headerEndY).lineTo(PAGE_W - MARGIN, headerEndY)
+      .lineWidth(0.75).strokeColor(DIVIDER).stroke();
+
+    let bodyY = headerEndY + 15;
+
+    // ── Section helpers ───────────────────────────────────────────────────────
+    function sectionTitle(title: string): void {
+      setFont().fontSize(10).fillColor(PRIMARY)
+        .text(title.toUpperCase(), MARGIN, bodyY, { width: CONTENT_W, lineBreak: false });
+      bodyY += 14;
+      doc.moveTo(MARGIN, bodyY - 2).lineTo(PAGE_W - MARGIN, bodyY - 2)
+        .lineWidth(0.5).strokeColor('#BFDBFE').stroke();
+      bodyY += 6;
+    }
+
+    function sectionBody(text: string): void {
+      setFont().fontSize(10).fillColor(MID);
+      doc.text(text, MARGIN, bodyY, { width: CONTENT_W, lineGap: 2 });
+      bodyY = doc.y + 10;
+    }
+
+    function sectionGap(): void {
+      doc.moveTo(MARGIN, bodyY).lineTo(PAGE_W - MARGIN, bodyY)
+        .lineWidth(0.5).strokeColor(DIVIDER).stroke();
+      bodyY += 13;
     }
 
     const summary    = (content['summary']    as string | undefined) ?? '';
     const experience = (content['experience'] as string | undefined) ?? '';
     const education  = (content['education']  as string | undefined) ?? '';
     const languages  = (content['languages']  as string | undefined) ?? '';
-    const additional = (content['additional'] as string | undefined) ?? '';
-    const rawText    = (content['rawText']    as string | undefined) ?? '';
 
-    if (summary)    section('О себе',        summary);
-    if (resume.skills.length > 0) {
-      section('Навыки', resume.skills.join(' • '));
+    if (summary) {
+      sectionTitle('О себе');
+      sectionBody(summary);
+      sectionGap();
     }
-    if (experience) section('Опыт работы',   experience);
-    if (education)  section('Образование',   education);
-    if (languages)  section('Языки',         languages);
-    if (additional) section('Дополнительно', additional);
-    if (!summary && !experience && rawText) {
-      section('Текст резюме', rawText.slice(0, 4000));
+
+    if (experience) {
+      sectionTitle('Опыт работы');
+      sectionBody(experience);
+      sectionGap();
+    }
+
+    if (education) {
+      sectionTitle('Образование');
+      sectionBody(education);
+      sectionGap();
+    }
+
+    if (resume.skills.length > 0) {
+      sectionTitle('Навыки');
+
+      const TAG_H = 20;
+      const PAD_H = 10;
+      const PAD_V = 4;
+      let tagX = MARGIN;
+      let tagY = bodyY;
+
+      setFont().fontSize(9);
+      for (const skill of resume.skills) {
+        const tw = doc.widthOfString(skill) + PAD_H * 2;
+        if (tagX + tw > PAGE_W - MARGIN) {
+          tagX = MARGIN;
+          tagY += TAG_H + 6;
+        }
+        doc.roundedRect(tagX, tagY, tw, TAG_H, 10).fill('#DBEAFE');
+        setFont().fontSize(9).fillColor('#1E40AF')
+          .text(skill, tagX + PAD_H, tagY + PAD_V, { width: tw - PAD_H * 2, lineBreak: false });
+        tagX += tw + 8;
+      }
+      bodyY = tagY + TAG_H + 13;
+      sectionGap();
+    }
+
+    if (languages) {
+      sectionTitle('Языки');
+      sectionBody(languages);
     }
 
     doc.end();
   } catch (e) {
-    // Headers not sent yet only if doc.pipe didn't start — safest to just log
     if (!res.headersSent) {
       fail(res, `PDF generation error: ${e instanceof Error ? e.message : 'unknown'}`);
     }
