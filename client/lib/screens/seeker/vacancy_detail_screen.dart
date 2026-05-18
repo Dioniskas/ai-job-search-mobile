@@ -7,7 +7,6 @@ import '../../services/api_service.dart';
 
 const _blue = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg = Color(0xFFF8FAFC);
 
 const _employmentLabels = {
   'FULL_TIME': 'Полная занятость',
@@ -223,7 +222,7 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -242,11 +241,12 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
     }
 
     if (_error != null || _vacancy == null) {
+      final cs = Theme.of(context).colorScheme;
       return Scaffold(
         appBar: AppBar(
           title: const Text('Вакансия'),
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF0F172A),
+          backgroundColor: cs.surface,
+          foregroundColor: cs.onSurface,
           elevation: 0,
         ),
         body: Center(
@@ -288,12 +288,13 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
       if (dt != null) dateStr = '${dt.day} ${_monthName(dt.month)} ${dt.year}';
     }
 
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Вакансия'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
         actions: isSeeker
             ? [
@@ -367,10 +368,10 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(v['title'] as String? ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A))),
+                                color: cs.onSurface)),
                         const SizedBox(height: 4),
                         Text(_employer?['companyName'] as String? ?? '',
                             style: const TextStyle(
@@ -406,15 +407,15 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
 
             // ── Description ───────────────────────────────────────────────────
             _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Описание вакансии',
+              Text('Описание вакансии',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: cs.onSurface)),
               const SizedBox(height: 10),
               Text(description,
-                  style: const TextStyle(
-                      color: Color(0xFF334155),
+                  style: TextStyle(
+                      color: cs.onSurface,
                       fontSize: 14,
                       height: 1.6)),
             ])),
@@ -422,11 +423,11 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
             // ── Похожие вакансии ──────────────────────────────────────────────
             if (_similar.isNotEmpty) ...[
               const SizedBox(height: 4),
-              const Text('Похожие вакансии',
+              Text('Похожие вакансии',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: cs.onSurface)),
               const SizedBox(height: 8),
               ..._similar.map((s) => _SimilarCard(
                     vacancy: s,
@@ -450,12 +451,13 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
   // ── Match % card ─────────────────────────────────────────────────────────────
 
   Widget _buildMatchCard() {
+    final cs = Theme.of(context).colorScheme;
     if (_matchLoading) {
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
@@ -480,7 +482,7 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
@@ -488,11 +490,11 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
         Row(children: [
           const Icon(Icons.auto_awesome_rounded, size: 16, color: _blue),
           const SizedBox(width: 6),
-          const Text('Совпадение с резюме',
+          Text('Совпадение с резюме',
               style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
-                  color: Color(0xFF0F172A))),
+                  color: cs.onSurface)),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -516,8 +518,8 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
             _matchExplanation!.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(_matchExplanation!,
-              style: const TextStyle(
-                  color: Color(0xFF334155), fontSize: 13, height: 1.4)),
+              style: TextStyle(
+                  color: cs.onSurface, fontSize: 13, height: 1.4)),
         ],
       ]),
     );
@@ -525,16 +527,19 @@ class _VacancyDetailScreenState extends State<VacancyDetailScreen> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────────
 
-  Widget _card(Widget child) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFE2E8F0)),
-    ),
-    child: child,
-  );
+  Widget _card(Widget child) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: child,
+    );
+  }
 
   Widget _logoAvatar(String? url) => CircleAvatar(
     radius: 24,
@@ -573,6 +578,7 @@ class _SimilarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final employer = vacancy['employer'] as Map<String, dynamic>?;
     final logoUrl  = employer?['logoUrl'] as String?;
     return Card(
@@ -582,7 +588,7 @@ class _SimilarCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: const Color(0xFFEFF6FF),
@@ -729,7 +735,9 @@ class _ApplySheetState extends State<_ApplySheet> {
     ),
   ]);
 
-  Widget _formView() => Column(
+  Widget _formView() {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -781,7 +789,7 @@ class _ApplySheetState extends State<_ApplySheet> {
                               : FontWeight.normal,
                           color: selected
                               ? _blue
-                              : const Color(0xFF0F172A))),
+                              : cs.onSurface)),
                 ),
                 if (selected)
                   const Icon(Icons.check_circle_rounded,
@@ -844,7 +852,8 @@ class _ApplySheetState extends State<_ApplySheet> {
                 style: TextStyle(fontSize: 16)),
       ),
     ],
-  );
+    );
+  }
 }
 
 // ── Vacancy History ────────────────────────────────────────────────────────────

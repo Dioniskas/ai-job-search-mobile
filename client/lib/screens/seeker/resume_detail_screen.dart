@@ -147,7 +147,7 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
     final score = content['aiScore'];
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       body: CustomScrollView(
         slivers: [
           // Header

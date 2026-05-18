@@ -6,7 +6,6 @@ import '../../services/api_service.dart';
 const _blue  = Color(0xFF2563EB);
 const _green = Color(0xFF16A34A);
 const _slate = Color(0xFF64748B);
-const _bg    = Color(0xFFF8FAFC);
 
 class EmployerHomeScreen extends StatefulWidget {
   const EmployerHomeScreen({super.key});
@@ -55,7 +54,7 @@ class _EmployerHomeScreenState extends State<EmployerHomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -68,13 +67,14 @@ class _EmployerHomeScreenState extends State<EmployerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Главная',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
         actions: [
           Stack(children: [

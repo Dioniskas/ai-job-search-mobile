@@ -9,7 +9,6 @@ import 'ai_candidates_screen.dart';
 
 const _blue = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg = Color(0xFFF8FAFC);
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -103,13 +102,14 @@ class _EmployerVacanciesScreenState extends State<EmployerVacanciesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Мои вакансии',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -201,6 +201,7 @@ class _VacancyItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isActive = vacancy['isActive'] as bool? ?? false;
     final countMap = vacancy['_count'] as Map<String, dynamic>?;
     final appCount = countMap?['applications'] as int? ?? 0;
@@ -222,7 +223,7 @@ class _VacancyItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -230,10 +231,10 @@ class _VacancyItem extends StatelessWidget {
             Expanded(
               child: Text(
                 vacancy['title'] as String? ?? '',
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A)),
+                    color: cs.onSurface),
               ),
             ),
             Switch(

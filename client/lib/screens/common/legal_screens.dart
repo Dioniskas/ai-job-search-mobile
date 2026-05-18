@@ -179,10 +179,9 @@ class _LegalTextScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(title),
         backgroundColor: cs.surface,
@@ -243,10 +242,9 @@ class AboutAppScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('О приложении'),
         backgroundColor: cs.surface,
@@ -486,10 +484,9 @@ class SupportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Поддержка'),
         backgroundColor: cs.surface,

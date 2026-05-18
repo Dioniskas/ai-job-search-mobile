@@ -7,7 +7,6 @@ import '../../services/api_service.dart';
 
 const _blue  = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg    = Color(0xFFF8FAFC);
 
 const _empTypes = [
   ('FULL_TIME',   'Полная занятость'),
@@ -151,13 +150,14 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Автопоиск',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
         actions: [
           IconButton(
@@ -171,7 +171,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           ? const Center(child: CircularProgressIndicator(color: _blue))
           : Column(children: [
               Container(
-                color: Colors.white,
+                color: cs.surface,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: const Text(
                   'Вы будете получать уведомления о новых вакансиях по заданным параметрам',
@@ -224,6 +224,7 @@ class _SubCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final query   = sub['query']          as String?;
     final city    = sub['city']           as String?;
     final salary  = sub['salaryMin']      as int?;
@@ -251,7 +252,7 @@ class _SubCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

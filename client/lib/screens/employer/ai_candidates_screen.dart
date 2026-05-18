@@ -7,7 +7,6 @@ import '../../services/api_service.dart';
 
 const _blue = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg = Color(0xFFF8FAFC);
 
 Color _percentColor(int p) {
   if (p >= 70) return const Color(0xFF16A34A);
@@ -55,18 +54,19 @@ class _AiCandidatesScreenState extends State<AiCandidatesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Подходящие кандидаты',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       body: Column(children: [
         Container(
-          color: Colors.white,
+          color: cs.surface,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: Row(children: [
             const Icon(Icons.work_outline_rounded, size: 14, color: _slate),
@@ -151,6 +151,7 @@ class _CandidateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final percent = (match['percent'] as num?)?.toInt() ?? 0;
     final reason  = match['reason']  as String? ?? '';
     final resume  = match['resume']  as Map<String, dynamic>?;
@@ -172,7 +173,7 @@ class _CandidateCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -199,10 +200,10 @@ class _CandidateCard extends StatelessWidget {
                   children: [
                     Text(
                       fullName.isEmpty ? 'Кандидат' : fullName,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
-                          color: Color(0xFF0F172A)),
+                          color: cs.onSurface),
                     ),
                     if (jobTitle.isNotEmpty)
                       Text(jobTitle,

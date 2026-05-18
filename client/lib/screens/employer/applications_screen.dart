@@ -9,7 +9,6 @@ import '../../services/api_service.dart';
 const _blue  = Color(0xFF2563EB);
 const _green = Color(0xFF16A34A);
 const _slate = Color(0xFF64748B);
-const _bg    = Color(0xFFF8FAFC);
 
 const _statusLabels = {
   'PENDING':  'Ожидает',
@@ -150,13 +149,14 @@ class _EmployerApplicationsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Отклики',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       body: _loading
@@ -229,6 +229,7 @@ class _AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final status   = app['status']  as String? ?? 'PENDING';
     final vacancy  = app['vacancy'] as Map<String, dynamic>?;
     final resume   = app['resume']  as Map<String, dynamic>?;
@@ -257,7 +258,7 @@ class _AppCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -301,10 +302,10 @@ class _AppCard extends StatelessWidget {
                   children: [
                     Text(
                       fullName.isEmpty ? 'Кандидат' : fullName,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
-                          color: Color(0xFF0F172A)),
+                          color: cs.onSurface),
                     ),
                     Row(children: [
                       Text(
@@ -398,7 +399,7 @@ class _AppCard extends StatelessWidget {
                       ? '${coverLetter.substring(0, 200)}...'
                       : coverLetter,
                   style:
-                      const TextStyle(color: Color(0xFF0F172A), fontSize: 12),
+                      TextStyle(color: cs.onSurface, fontSize: 12),
                 ),
               ]),
             ),

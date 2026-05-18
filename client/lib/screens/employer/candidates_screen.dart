@@ -9,7 +9,6 @@ import 'ai_candidates_screen.dart';
 const _blue  = Color(0xFF2563EB);
 const _green = Color(0xFF16A34A);
 const _slate = Color(0xFF64748B);
-const _bg    = Color(0xFFF8FAFC);
 
 const _searchStatusLabel = {
   'ACTIVE':      'Активно ищет',
@@ -76,7 +75,7 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -131,13 +130,14 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Кандидаты',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       body: _loading
@@ -247,8 +247,8 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(e.value,
-                                style: const TextStyle(
-                                    fontSize: 13, color: Color(0xFF0F172A))),
+                                style: TextStyle(
+                                    fontSize: 13, color: cs.onSurface)),
                           ]),
                         )),
                       ],
@@ -262,10 +262,10 @@ class _EmployerCandidatesScreenState extends State<EmployerCandidatesScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Мои вакансии (${_vacancies.length})',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
-                            color: Color(0xFF0F172A)),
+                            color: cs.onSurface),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -293,6 +293,7 @@ class _VacancyTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isActive  = vacancy['isActive'] as bool? ?? false;
     final countMap  = vacancy['_count'] as Map<String, dynamic>?;
     final appCount  = countMap?['applications'] as int? ?? 0;
@@ -304,7 +305,7 @@ class _VacancyTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 4),

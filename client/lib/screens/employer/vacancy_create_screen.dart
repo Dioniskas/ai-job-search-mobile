@@ -6,7 +6,6 @@ import '../../services/api_service.dart';
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const _blue = Color(0xFF2563EB);
-const _bg = Color(0xFFF8FAFC);
 
 const _employmentTypes = [
   ('FULL_TIME', 'Полная занятость'),
@@ -200,13 +199,14 @@ class _EmployerVacancyCreateScreenState
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Создать вакансию',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       body: Form(

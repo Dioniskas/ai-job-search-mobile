@@ -156,10 +156,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Редактировать резюме'),
         backgroundColor: cs.surface,

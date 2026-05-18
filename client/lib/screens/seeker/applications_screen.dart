@@ -9,7 +9,6 @@ import 'vacancy_detail_screen.dart';
 
 const _blue = Color(0xFF2563EB);
 const _slate = Color(0xFF64748B);
-const _bg = Color(0xFFF8FAFC);
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
 
@@ -133,13 +132,14 @@ class _SeekerApplicationsScreenState extends State<SeekerApplicationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Мои отклики',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       body: _loading
@@ -207,6 +207,7 @@ class _AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final status   = app['status'] as String? ?? 'PENDING';
     final vacancy  = app['vacancy'] as Map<String, dynamic>?;
     final employer = vacancy?['employer'] as Map<String, dynamic>?;
@@ -238,7 +239,7 @@ class _AppCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: color.withValues(alpha: 0.25)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: vacancy == null
@@ -281,10 +282,10 @@ class _AppCard extends StatelessWidget {
                     children: [
                       Text(
                         vacancy?['title'] as String? ?? '',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
-                            color: Color(0xFF0F172A)),
+                            color: cs.onSurface),
                       ),
                       Text(
                         employer?['companyName'] as String? ?? '',

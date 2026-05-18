@@ -62,11 +62,9 @@ class _SeekerResumeScreenState extends State<SeekerResumeScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? cs.surface : const Color(0xFFF8FAFC);
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Мои резюме'),
         backgroundColor: cs.surface,

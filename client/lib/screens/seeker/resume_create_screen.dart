@@ -15,10 +15,9 @@ class ResumeCreateScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Создать резюме'),
         backgroundColor: cs.surface,
@@ -278,7 +277,7 @@ class _UploadPdfScreenState extends State<_UploadPdfScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(widget.improve ? 'PDF + Ассистент' : 'Загрузить PDF'),
         backgroundColor: cs.surface,
@@ -451,10 +450,9 @@ class _FormScreenState extends State<_FormScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Заполнить форму'),
         backgroundColor: cs.surface,
@@ -703,10 +701,9 @@ class _VoiceScreenState extends State<_VoiceScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? cs.surface : const Color(0xFFF8FAFC),
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Создать голосом'),
         backgroundColor: cs.surface,

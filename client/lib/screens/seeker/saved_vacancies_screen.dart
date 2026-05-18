@@ -9,7 +9,6 @@ import 'vacancy_detail_screen.dart';
 const _blue  = Color(0xFF2563EB);
 const _green = Color(0xFF16A34A);
 const _slate = Color(0xFF64748B);
-const _bg    = Color(0xFFF8FAFC);
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -58,13 +57,14 @@ class _SavedVacanciesScreenState extends State<SavedVacanciesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: const Text('Избранное',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         elevation: 0,
       ),
       body: _loading
@@ -130,6 +130,7 @@ class _SavedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final employer  = vacancy['employer'] as Map<String, dynamic>?;
     final logoUrl   = employer?['logoUrl'] as String?;
     final salaryMin = vacancy['salaryMin'] as int?;
@@ -152,7 +153,7 @@ class _SavedCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
-      color: Colors.white,
+      color: cs.surfaceContainer,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.push(
@@ -182,10 +183,10 @@ class _SavedCard extends StatelessWidget {
                   children: [
                 Text(
                   vacancy['title'] as String? ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: Color(0xFF0F172A)),
+                      color: cs.onSurface),
                 ),
                 const SizedBox(height: 2),
                 Text(
