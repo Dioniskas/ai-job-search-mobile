@@ -10,6 +10,18 @@
 
 ---
 
+## Рабочий процесс (Claude Code)
+
+В начале каждой сессии:
+1. `clear` — очистить терминал
+2. `cd C:\Projects\ai-job-search-mobile` — перейти в папку проекта
+3. Запустить `claude` и написать `caveman`
+4. Claude Code читает CLAUDE.md и продолжает с текущего блока
+
+После каждой задачи: `git add . && git commit -m "..." && git push origin master`
+
+---
+
 ## Стек технологий
 
 ### Мобильное приложение (client/) — Flutter
@@ -25,6 +37,7 @@
 - printing + pdf (генерация PDF резюме)
 - cached_network_image (кеширование изображений)
 - firebase_messaging (push-уведомления)
+- google_sign_in: ^6.2.1 (Google OAuth)
 - Material Design 3
 
 ### Бэкенд (server/) — Node.js
@@ -37,6 +50,7 @@
 - helmet.js, express-rate-limit, zod
 - nodemailer (email)
 - firebase-admin (push-уведомления)
+- google-auth-library (Google OAuth верификация)
 
 ---
 
@@ -45,10 +59,20 @@
 ### Бэкенд
 - Railway: https://ai-job-search-mobile-production.up.railway.app
 - БД: Supabase PostgreSQL
+- Node.js версия: 20 (NIXPACKS_NODE_VERSION=20)
 
 ### Мобильное приложение
-- APK собран: client/build/app/outputs/flutter-apk/app-release.apk
-- API URL в api_service.dart: https://ai-job-search-mobile-production.up.railway.app
+- APK: client/build/app/outputs/flutter-apk/app-release.apk
+- API URL: https://ai-job-search-mobile-production.up.railway.app
+- Для локальной разработки менять baseUrl в client/lib/services/api_service.dart
+
+### Локальная разработка (ТЕКУЩИЙ РЕЖИМ)
+- Сервер: `cd server && npm run dev` (порт 5000)
+- Flutter на телефоне: подключить USB + `cd client && flutter run`
+- Flutter Web: `cd client && flutter run -d chrome --web-browser-flag "--disable-web-security"`
+- API URL для локалки: http://192.168.x.x:5000 (узнать IP через ipconfig)
+- Менять baseUrl в client/lib/services/api_service.dart
+- Railway используется только для финального деплоя и APK сборки
 
 ---
 
@@ -60,15 +84,16 @@ client/
 │   ├── main.dart
 │   ├── screens/
 │   │   ├── auth/
-│   │   │   ├── login_screen.dart
+│   │   │   ├── login_screen.dart         # Google Sign In добавлен
 │   │   │   └── register_screen.dart
 │   │   ├── seeker/
-│   │   │   ├── seeker_dashboard.dart
-│   │   │   ├── seeker_profile_screen.dart
-│   │   │   ├── resume_list_screen.dart
-│   │   │   ├── resume_view_screen.dart
-│   │   │   ├── resume_edit_screen.dart
-│   │   │   ├── vacancy_search_screen.dart
+│   │   │   ├── home_screen.dart          # Приветствие по времени, статистика
+│   │   │   ├── profile_screen.dart       # Тёмная тема, статус поиска
+│   │   │   ├── resume_screen.dart        # Bottom sheet с 4 вариантами создания
+│   │   │   ├── resume_create_screen.dart # 4 способа создания резюме
+│   │   │   ├── resume_detail_screen.dart # Просмотр с фото
+│   │   │   ├── resume_edit_screen.dart   # Редактирование с фото
+│   │   │   ├── search_screen.dart        # Слайдер зарплаты, сортировка
 │   │   │   ├── vacancy_detail_screen.dart
 │   │   │   ├── applications_screen.dart
 │   │   │   ├── ai_match_screen.dart
@@ -89,7 +114,7 @@ client/
 │   │       └── notifications_screen.dart
 │   ├── services/api_service.dart
 │   ├── providers/
-│   │   ├── auth_provider.dart
+│   │   ├── auth_provider.dart            # loginWithGoogle добавлен
 │   │   └── theme_provider.dart
 │   ├── models/
 │   └── widgets/
@@ -109,21 +134,18 @@ client/
 - createdAt
 
 ### seeker_profiles
-- id, userId, photoUrl, city
+- id, userId, firstName, lastName, middleName, age, phone
+- photoUrl, city, about
 - isVisible, searchStatus (ACTIVE | OPEN | NOT_LOOKING), boostedUntil
 
 ### resumes
-- id, seekerId, title, content (JSON), pdfUrl, isAiGenerated
-- skills (array), experience, aiScore, aiScoreFeedback
-- isMain (основное резюме)
+- id, seekerId, title, content (JSON), pdfUrl, photoUrl (добавлено)
+- isAiGenerated, isMain, skills (array), experience
 - createdAt, updatedAt
 
 ### employers
 - id, userId, companyName, description, website, logoUrl, city
-- rating, reviewCount, isVerified
-
-### employer_reviews
-- id, seekerId, employerId, rating (1-5), comment, createdAt
+- isVerified
 
 ### vacancies
 - id, employerId, title, description, salaryMin, salaryMax
@@ -135,27 +157,8 @@ client/
 - status (PENDING | VIEWED | ACCEPTED | REJECTED)
 - coverLetter, matchPercent, createdAt
 
-### messages
-- id, senderId, receiverId, applicationId, text, isRead, createdAt
-
-### notifications
-- id, userId, type, text, isRead, link, createdAt
-
-### saved_vacancies
-- id, seekerId, vacancyId, createdAt
-
-### vacancy_subscriptions
-- id, seekerId, query, city, salaryMin, employmentType, createdAt
-
-### refresh_tokens
-- id, userId, token, expiresAt, createdAt
-
-### reports
-- id, reporterId, targetId, targetType, reason, isResolved, createdAt
-
-### payments
-- id, userId, type, amount, status, createdAt
-
+### messages, notifications, saved_vacancies, refresh_tokens
+### reports, payments, vacancy_subscriptions
 ### seeker_analytics, employer_analytics, viewed_vacancies, user_badges, skill_tests
 
 ---
@@ -170,6 +173,7 @@ client/
 - GET /api/auth/me
 - POST /api/auth/forgot-password
 - POST /api/auth/reset-password
+- POST /api/auth/google/mobile (Google OAuth)
 
 ### Соискатель
 - GET/PUT /api/seeker/profile
@@ -186,6 +190,7 @@ client/
 - GET /api/resume/:id/pdf
 - PUT /api/resume/:id
 - PUT /api/resume/:id/set-main
+- POST /api/resume/:id/photo (загрузка фото резюме)
 - DELETE /api/resume/:id
 
 ### Вакансии
@@ -197,8 +202,8 @@ client/
 - PUT /api/vacancies/:id
 - DELETE /api/vacancies/:id
 
-### ИИ-функции
-- POST /api/ai/match-vacancies (использует isMain резюме)
+### ИИ-функции (везде "Ассистент" в UI)
+- POST /api/ai/match-vacancies
 - POST /api/ai/match-resumes
 - POST /api/ai/cover-letter
 - POST /api/ai/match-percent
@@ -209,68 +214,37 @@ client/
 - POST /api/ai/rejection-reason
 - POST /api/ai/vacancy-hints
 
-### Отклики
-- POST /api/applications
-- GET /api/applications/seeker
-- GET /api/applications/employer
-- PUT /api/applications/:id/status
-- PUT /api/applications/:id/viewed
+### Остальные роуты
+- /api/applications, /api/chat, /api/notifications
+- /api/analytics, /api/employer, /api/admin
+- /api/reports, /api/boost, /api/payments
+- /api/users/fcm-token, /api/users/email-notifications
 
-### Чат + Socket.io
-- GET /api/chat/conversations
-- GET /api/chat/:applicationId/messages
-- POST /api/chat/:applicationId/messages
+---
 
-### Уведомления
-- GET /api/notifications
-- PUT /api/notifications/:id/read
-- PUT /api/notifications/read-all
+## Google OAuth конфигурация
 
-### Аналитика
-- GET /api/analytics/seeker
-- GET /api/analytics/employer/:vacancyId
-- GET /api/analytics/market/:profession
-
-### Работодатель
-- GET/PUT /api/employer/profile
-- POST /api/employer/profile/logo
-- POST /api/employer/reviews
-- GET /api/employer/:id/reviews
-
-### Модерация (Admin)
-- POST /api/admin/vacancies/:id/moderate
-- POST /api/admin/employers/:id/verify
-- POST /api/admin/users/:id/block
-- POST /api/admin/create-admin
-
-### Жалобы
-- POST /api/reports
-
-### Монетизация
-- POST /api/boost/resume
-- POST /api/boost/vacancy
-- GET /api/payments/history
-- POST /api/payments/payme/create (тестовый режим)
-- POST /api/payments/click/create (тестовый режим)
-
-### Push-уведомления
-- POST /api/users/fcm-token
-
-### Email настройки
-- PUT /api/users/email-notifications
+- Firebase проект: ai-job-search-70a97
+- Google Cloud проект: ai-job-search-f4e2a (НЕ "My First Project"!)
+- Web Client ID: 685871848467-m1ef595poflafe15a836ibrj3hfejbjq.apps.googleusercontent.com
+- Android Client ID: 310538934424-ob4g36nbd2p1fl7gqdkumm45j1kbhuh9.apps.googleusercontent.com
+- SHA-1 debug: F8:5D:A4:47:83:15:B6:A8:DA:BB:D3:BE:C7:9E:D7:24:43:52:9B:67
+- SHA-1 получить: cd client/android && ./gradlew signingReport
+- Проблема: ApiException 10 — нужно пересоздать Android OAuth client в проекте ai-job-search-f4e2a
 
 ---
 
 ## Переменные окружения (server/.env и Railway)
 
 ```
-DATABASE_URL=postgresql://...pooler...6543...?pgbouncer=true&connection_limit=1
-DIRECT_URL=postgresql://...session pooler...5432...
-JWT_SECRET=den7026960
-JWT_REFRESH_SECRET=den7026960_refresh_secret_change_in_prod
+DATABASE_URL=postgresql://postgres.morniwpjfhgkpqnanpny:[PASSWORD]@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&prepared_statements=false
+DIRECT_URL=postgresql://postgres.morniwpjfhgkpqnanpny:[PASSWORD]@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
+JWT_SECRET=[JWT_SECRET]
+JWT_REFRESH_SECRET=[JWT_REFRESH_SECRET]
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=30d
 PORT=5000
+NIXPACKS_NODE_VERSION=20
 GROQ_API_KEY=...
 IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/dioniskas
 IMAGEKIT_PUBLIC_KEY=...
@@ -282,6 +256,8 @@ EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=den7026960@gmail.com
 EMAIL_PASS=...
+GOOGLE_CLIENT_ID=[GOOGLE_CLIENT_ID]
+GOOGLE_CLIENT_SECRET=[GOOGLE_CLIENT_SECRET]
 FRONTEND_URL=https://ai-job-search-mobile-production.up.railway.app
 CLIENT_URL=https://ai-job-search-mobile-production.up.railway.app
 PAYME_MERCHANT_ID=test
@@ -300,87 +276,89 @@ CLICK_TEST_MODE=true
 - Основной цвет: синий (#2563EB)
 - Акцентный: зелёный (#16A34A)
 - Предупреждения: оранжевый (#F97316)
-- Фон светлый: #FFFFFF, тёмный: #0F172A
+- Фон светлый: cs.surface, тёмный: cs.surface (через ThemeProvider)
 - Material Design 3, Bottom navigation bar
-- Глобальная тёмная тема через ThemeProvider
+- Глобальная тёмная тема через ThemeProvider ✅
 - Все тексты на русском языке
+- "ИИ" заменён на "Ассистент" везде в UI
 
 ---
 
 ## Статус блоков
 
 ### ✅ Блок 1 — Доделка (ГОТОВО)
-- Редактирование резюме, скачать PDF, профиль упрощён, выбор основного резюме
-
 ### ✅ Блок 2 — Безопасность (ГОТОВО)
-- Rate limiting, Helmet.js, zod, CORS, refresh токены, обработка ошибок
-
 ### ✅ Блок 3 — Производительность (ГОТОВО)
-- Пагинация, бесконечная прокрутка, кеширование, debounce поиск, cached_network_image
-
 ### ✅ Блок 4 — Push-уведомления (ГОТОВО)
-- Firebase FCM, уведомления при откликах, сообщениях, изменении статуса
-
 ### ✅ Блок 5 — Email уведомления (ГОТОВО)
-- Nodemailer, Gmail SMTP, приветствие, отклики, сброс пароля
-
 ### ✅ Блок 6 — Модерация и верификация (ГОТОВО)
-- Модерация вакансий, верификация работодателей, жалобы, блокировка
-
 ### ✅ Блок 7 — Монетизация (ГОТОВО)
-- Payme и Click (тестовый режим), поднятие резюме/вакансий, история платежей
-
 ### ✅ Блок 8 — Админ панель (ГОТОВО)
-- React веб-панель на localhost:3001, вход через ADMIN роль
-- Дашборд, пользователи, вакансии, верификация, жалобы, платежи
-
 ### ✅ Блок 9 — Политика и документы (ГОТОВО)
-- Политика конфиденциальности, пользовательское соглашение, поддержка
 
 ### 🔄 Блок 10 — Деплой и релиз (В ПРОЦЕССЕ)
 - ✅ Supabase БД настроена и мигрирована
-- ✅ Railway деплой настроен
-- ✅ APK собран
-- ❌ APK не работает — ошибка 502 при входе (проблема с колонками в Supabase)
-- Текущая проблема: добавляем недостающие колонки в Supabase через SQL Editor
+- ✅ Railway деплой работает, Node.js 20
+- ✅ APK собирается и работает на телефоне
+- ✅ CORS исправлен для Flutter Web и мобильного
+- ✅ ImageKit работает
+- ⚠️ Connection pool timeout на бесплатном Supabase — нужен retry или upgrade до Pro
+- ❌ Google OAuth не работает (ApiException: 10)
+- ❌ Голосовой ввод не работает
 
-### 📋 Блок 11 — Локализация (Узбекский язык)
+### 🔄 Блок 11 — UX и дизайн (В ПРОЦЕССЕ)
+- ✅ Тёмная тема глобально (исправлено 17 файлов)
+- ✅ Новый UX резюме — bottom sheet с 4 вариантами
+- ✅ "Ассистент" вместо "ИИ" везде
+- ✅ Главный экран — приветствие, статистика
+- ✅ Поиск — слайдер зарплаты, сортировка
+- ✅ Редактирование резюме с фото
+- ❌ PDF резюме — нужен профессиональный дизайн с фото как hh.ru
+
+### 📋 Блок 12 — Google OAuth (В РАЗРАБОТКЕ)
+- Серверная часть готова (google-auth.controller.ts)
+- Флаттер часть готова (login_screen.dart)
+- ❌ ApiException 10 — нужно пересоздать Android client в правильном проекте
+
+### 📋 Блок 13 — Голосовой ввод резюме (НЕ РАБОТАЕТ)
+- flutter_sound установлен
+- Роут POST /api/resume/generate/voice есть
+- Нужна диагностика ошибки
+
+### 📋 Блок 14 — Локализация (Узбекский язык)
 - flutter_localizations
-- Переключатель язык: Русский / O'zbekcha
-- Все тексты и ИИ промпты на узбекском
+- Переключатель: Русский / O'zbekcha
 
-### 📋 Блок 12 — iOS версия
+### 📋 Блок 15 — iOS версия
 - Адаптация Flutter под iOS
 - Публикация в App Store
 
 ---
 
-## Текущие проблемы (требуют решения)
+## Текущие проблемы (приоритет)
 
-1. APK выдаёт 502 при входе — в Supabase не хватает колонок
-2. Тёмная тема не работает глобально (только профиль и резюме)
-3. Карта вакансий не работает (отложено)
-4. Тестовые вакансии не созданы (seed не выполнен)
-5. Нужно сменить все ключи API (они были показаны в открытом чате)
+1. ❌ Google OAuth ApiException 10 — пересоздать Android client в проекте ai-job-search-f4e2a
+2. ❌ Голосовой ввод — диагностика и исправление
+3. ⚠️ Connection pool timeout — retry логика или Supabase Pro
+4. ❌ PDF резюме — профессиональный дизайн с фото
+5. ⚠️ Все ключи API в открытом чате — сменить перед релизом
 
 ---
 
-## Важные заметки для Claude
+## Важные заметки для Claude Code
 
 - Все ИИ-промпты начинать с "Отвечай ТОЛЬКО на русском языке."
+- В UI писать "Ассистент" вместо "ИИ"
 - Groq базовый URL: https://api.groq.com/openai/v1
 - Groq модель текст: llama-3.3-70b-versatile
 - Groq модель голос: whisper-large-v3
-- API URL Flutter: https://ai-job-search-mobile-production.up.railway.app
 - JWT хранить в flutter_secure_storage
 - ИИ-подбор использует резюме где isMain = true
 - Socket.io namespace /chat
-- PDF генерировать через printing + pdf в Flutter
-- Профиль соискателя: только фото + выбор основного резюме + настройки
 - isMain — только одно резюме может быть основным
-- Новые вакансии показываются только если isModerated = true
-- trust proxy 1 добавлен в index.ts для Railway
-- Админ: den7026960@gmail.com / den58354037
+- Новые вакансии только если isModerated = true
+- trust proxy 1 в index.ts для Railway
+- Админ: den7026960@gmail.com / [PASSWORD]
 - GitHub: https://github.com/Dioniskas/ai-job-search-mobile
 - Railway root directory: server/
-- Keystore для APK сохранён — без него нельзя обновить приложение в Google Play
+- Keystore для APK сохранён — без него нельзя обновить в Google Play
