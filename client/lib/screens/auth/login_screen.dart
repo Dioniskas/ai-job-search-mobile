@@ -63,7 +63,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       if (!mounted) return;
-      context.go('/');
+      final role = context.read<AuthProvider>().role;
+      context.go(role == 'EMPLOYER' ? '/employer' : '/seeker');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
