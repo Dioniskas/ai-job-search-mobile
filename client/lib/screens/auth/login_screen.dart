@@ -49,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final googleSignIn = GoogleSignIn(
         serverClientId: '543184751033-9c7squ54rcf57b1spqalkhohrqug5vvp.apps.googleusercontent.com',
       );
+      await googleSignIn.signOut();
       final account = await googleSignIn.signIn();
       if (account == null) return;
       final auth = await account.authentication;
@@ -63,8 +64,13 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       if (!mounted) return;
-      final role = context.read<AuthProvider>().role;
-      context.go(role == 'EMPLOYER' ? '/employer' : '/seeker');
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.pendingGoogleData != null) {
+        context.go('/role-select');
+      } else {
+        final role = authProvider.role;
+        context.go(role == 'EMPLOYER' ? '/employer' : '/seeker');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

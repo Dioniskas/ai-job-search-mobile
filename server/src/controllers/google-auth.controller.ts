@@ -6,45 +6,91 @@ import { ok, fail } from '../utils/response';
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const AUDIENCE = [
+  '543184751033-9c7squ54rcf57b1spqalkhohrqug5vvp.apps.googleusercontent.com',
+  '543184751033-u2b74vsdbdhobs69gp8t337lavm0k4ve.apps.googleusercontent.com',
+];
+
+function issueTokens(userId: string, role: string) {
+  const accessToken = jwt.sign(
+    { userId, role },
+    process.env.JWT_SECRET!,
+    { expiresIn: process.env.JWT_EXPIRES_IN ?? '15m' } as jwt.SignOptions,
+  );
+  const refreshToken = jwt.sign(
+    { userId },
+    process.env.JWT_REFRESH_SECRET!,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d' } as jwt.SignOptions,
+  );
+  return { accessToken, refreshToken };
+}
+
+async function saveRefreshToken(userId: string, token: string) {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+  await prisma.refreshToken.create({ data: { userId, token, expiresAt } });
+}
+
 // POST /api/auth/google/mobile
-// Flutter отправляет idToken полученный от google_sign_in
 export async function googleMobileAuth(req: Request, res: Response): Promise<void> {
   const { idToken } = req.body as { idToken?: string };
   if (!idToken) { fail(res, 'idToken is required'); return; }
 
   let payload;
   try {
-    const ticket = await client.verifyIdToken({
-      idToken,
-      audience: [
-        '543184751033-9c7squ54rcf57b1spqalkhohrqug5vvp.apps.googleusercontent.com',
-        '543184751033-u2b74vsdbdhobs69gp8t337lavm0k4ve.apps.googleusercontent.com',
-      ],
-    });
+    const ticket = await client.verifyIdToken({ idToken, audience: AUDIENCE });
     payload = ticket.getPayload();
-  } catch (e) {
+  } catch {
     fail(res, 'Invalid Google token', 401);
     return;
   }
 
   if (!payload?.email) { fail(res, 'No email in Google token', 401); return; }
 
-  const { email, name, picture, sub: googleId } = payload;
+  const { email, name, picture } = payload;
 
-  // Find or create user
-  let user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    // New user — create with SEEKER role by default
-    user = await prisma.user.create({
-      data: {
-        email,
-        password: `google_${googleId}`, // not used for login
-        role: 'SEEKER',
-      },
-    });
+    ok(res, { isNewUser: true, googleData: { email, name, picture } });
+    return;
+  }
 
-    // Create seeker profile with Google data
+  if (user.isBlocked) { fail(res, 'Аккаунт заблокирован', 403); return; }
+
+  const { accessToken, refreshToken } = issueTokens(user.id, user.role);
+  await saveRefreshToken(user.id, refreshToken);
+
+  ok(res, {
+    isNewUser: false,
+    accessToken,
+    refreshToken,
+    user: { id: user.id, email: user.email, role: user.role },
+  });
+}
+
+// POST /api/auth/google/complete
+export async function googleCompleteAuth(req: Request, res: Response): Promise<void> {
+  const { email, name, picture, role } = req.body as {
+    email?: string;
+    name?: string;
+    picture?: string;
+    role?: string;
+  };
+
+  if (!email || !role || !['SEEKER', 'EMPLOYER'].includes(role)) {
+    fail(res, 'email and role (SEEKER|EMPLOYER) are required');
+    return;
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) { fail(res, 'Пользователь уже существует', 409); return; }
+
+  const user = await prisma.user.create({
+    data: { email, password: `google_${Date.now()}`, role: role as 'SEEKER' | 'EMPLOYER' },
+  });
+
+  if (role === 'SEEKER') {
     const nameParts = (name ?? '').split(' ');
     await prisma.seekerProfile.create({
       data: {
@@ -54,37 +100,18 @@ export async function googleMobileAuth(req: Request, res: Response): Promise<voi
         photoUrl: picture,
       },
     });
+  } else {
+    await prisma.employer.create({
+      data: { userId: user.id, companyName: name ?? '' },
+    });
   }
 
-  if (user.isBlocked) { fail(res, 'Аккаунт заблокирован', 403); return; }
-
-  // Issue JWT tokens
-  const accessToken = jwt.sign(
-    { userId: user.id, role: user.role },
-    process.env.JWT_SECRET!,
-    { expiresIn: process.env.JWT_EXPIRES_IN ?? '15m' } as jwt.SignOptions,
-  );
-
-  const refreshToken = jwt.sign(
-    { userId: user.id },
-    process.env.JWT_REFRESH_SECRET!,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d' } as jwt.SignOptions,
-  );
-
-  // Save refresh token
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30);
-  await prisma.refreshToken.create({
-    data: { userId: user.id, token: refreshToken, expiresAt },
-  });
+  const { accessToken, refreshToken } = issueTokens(user.id, user.role);
+  await saveRefreshToken(user.id, refreshToken);
 
   ok(res, {
     accessToken,
     refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    },
+    user: { id: user.id, email: user.email, role: user.role },
   });
 }

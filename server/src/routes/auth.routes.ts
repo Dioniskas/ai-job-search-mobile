@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { register, login, refresh, logout, me, forgotPassword, resetPassword } from '../controllers/auth.controller';
+import { googleMobileAuth, googleCompleteAuth } from '../controllers/google-auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validate.middleware';
 import { registerSchema, loginSchema, refreshSchema } from '../validation/schemas';
@@ -30,5 +31,7 @@ router.post('/logout',         authenticate,                              logout
 router.get('/me',              authenticate,                              me);
 router.post('/forgot-password', loginLimiter,                             forgotPassword);
 router.post('/reset-password',                                            resetPassword);
+router.post('/google/mobile',                                             googleMobileAuth);
+router.post('/google/complete',                                           googleCompleteAuth);
 
 export default router;

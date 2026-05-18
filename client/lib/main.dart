@@ -10,6 +10,7 @@ import 'providers/privacy_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
+import 'screens/auth/role_select_screen.dart';
 import 'screens/seeker/seeker_shell.dart';
 import 'screens/employer/employer_shell.dart';
 import 'screens/common/legal_screens.dart';
@@ -75,6 +76,10 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) => const RegisterScreen(),
         ),
         GoRoute(
+          path: '/role-select',
+          builder: (context, state) => const RoleSelectScreen(),
+        ),
+        GoRoute(
           path: '/seeker',
           builder: (context, state) => const SeekerShell(),
         ),
@@ -123,7 +128,7 @@ class _MyAppState extends State<MyApp> {
       return location == '/splash' ? null : '/splash';
     }
 
-    final onAuthPage = location == '/login' || location == '/register';
+    final onAuthPage = location == '/login' || location == '/register' || location == '/role-select';
     final onSplash = location == '/splash';
 
     if (!isAuth && (onSplash || !onAuthPage)) return '/login';

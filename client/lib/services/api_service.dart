@@ -18,7 +18,7 @@ class _CacheEntry {
 }
 
 class ApiService {
-  static const String baseUrl = 'https://ai-job-search-mobile-production.up.railway.app';
+  static const String baseUrl = 'http://192.168.1.107:5000';
   static const _timeout = Duration(seconds: 15);
 
   // ── In-memory cache ────────────────────────────────────────────────────────
@@ -197,6 +197,16 @@ class ApiService {
   );
   return _parsePublic(response);
 }
+
+  static Future<Map<String, dynamic>> googleComplete(
+      String email, String name, String picture, String role) async {
+    final response = await _safePost(
+      Uri.parse('$baseUrl/api/auth/google/complete'),
+      headers: _headers(),
+      body: json.encode({'email': email, 'name': name, 'picture': picture, 'role': role}),
+    );
+    return _parsePublic(response);
+  }
 
 static Future<Map<String, dynamic>> updateResume(String token, String id, Map<String, dynamic> data) async {
   final response = await _safePut(

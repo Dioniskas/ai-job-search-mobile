@@ -14,11 +14,13 @@ class AuthProvider extends ChangeNotifier {
   String? _refreshToken;
   String? _role;
   Map<String, dynamic>? _user;
+  Map<String, dynamic>? _pendingGoogleData;
   bool _isLoading = true;
 
-  String? get token          => _token;
-  String? get role           => _role;
-  Map<String, dynamic>? get user => _user;
+  String? get token                          => _token;
+  String? get role                           => _role;
+  Map<String, dynamic>? get user             => _user;
+  Map<String, dynamic>? get pendingGoogleData => _pendingGoogleData;
   bool get isAuthenticated   => _token != null;
   bool get isLoading         => _isLoading;
 
@@ -41,14 +43,36 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<String?> loginWithGoogle(String idToken) async {
-  try {
-    final data = await ApiService.googleLogin(idToken);
-    await _saveSession(data);
-    return null;
-  } catch (e) {
-    return _message(e);
+    try {
+      final data = await ApiService.googleLogin(idToken);
+      if (data['isNewUser'] == true) {
+        _pendingGoogleData = data['googleData'] as Map<String, dynamic>;
+        notifyListeners();
+        return null;
+      }
+      await _saveSession(data);
+      return null;
+    } catch (e) {
+      return _message(e);
+    }
   }
-}
+
+  Future<String?> completeGoogleAuth(String role) async {
+    try {
+      final g = _pendingGoogleData!;
+      final data = await ApiService.googleComplete(
+        g['email'] as String,
+        g['name'] as String? ?? '',
+        g['picture'] as String? ?? '',
+        role,
+      );
+      _pendingGoogleData = null;
+      await _saveSession(data);
+      return null;
+    } catch (e) {
+      return _message(e);
+    }
+  }
 
   Future<String?> register(String email, String password, String role) async {
     try {
