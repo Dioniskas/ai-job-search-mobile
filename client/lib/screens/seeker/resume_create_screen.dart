@@ -7,15 +7,17 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import 'resume_detail_screen.dart';
 
-// ── Main choice screen ───────────────────────────────────────────────────────
+// ── Backwards-compat full-screen selector (used by profile_screen) ────────────
 
 class ResumeCreateScreen extends StatelessWidget {
   const ResumeCreateScreen({super.key});
 
+  void _push(BuildContext context, Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -28,138 +30,90 @@ class ResumeCreateScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          Text(
-            'Как создать резюме?',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: cs.onSurface,
-            ),
-          ),
+          Text('Как создать резюме?',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurface)),
           const SizedBox(height: 4),
-          Text(
-            'Выберите удобный способ',
-            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
-          ),
+          Text('Выберите удобный способ',
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant)),
           const SizedBox(height: 20),
-          _MethodCard(
-            icon: Icons.upload_file_rounded,
+          _MethodTile(
+            emoji: '📄',
             title: 'Загрузить PDF',
             subtitle: 'Уже есть готовое резюме',
-            color: const Color(0xFF2563EB),
-            onTap: () => _push(context, const _UploadPdfScreen(improve: false)),
+            onTap: () => _push(context, const ResumeUploadPdfScreen(improve: false)),
           ),
-          _MethodCard(
-            icon: Icons.auto_awesome_rounded,
+          _MethodTile(
+            emoji: '✨',
             title: 'PDF + Ассистент',
-            subtitle: 'Загрузи PDF, Ассистент улучшит',
-            color: const Color(0xFF7C3AED),
-            onTap: () => _push(context, const _UploadPdfScreen(improve: true)),
+            subtitle: 'Загрузи PDF — Ассистент улучшит',
+            onTap: () => _push(context, const ResumeUploadPdfScreen(improve: true)),
           ),
-          _MethodCard(
-            icon: Icons.edit_note_rounded,
+          _MethodTile(
+            emoji: '📝',
             title: 'Заполнить форму',
             subtitle: 'Ассистент составит резюме',
-            color: const Color(0xFF0891B2),
-            onTap: () => _push(context, const _FormScreen()),
+            onTap: () => _push(context, const ResumeFormScreen()),
           ),
-          _MethodCard(
-            icon: Icons.mic_rounded,
+          _MethodTile(
+            emoji: '🎤',
             title: 'Голосом',
-            subtitle: 'Расскажи о себе, Ассистент оформит',
-            color: const Color(0xFF16A34A),
-            onTap: () => _push(context, const _VoiceScreen()),
+            subtitle: 'Расскажи о себе — Ассистент оформит',
+            onTap: () => _push(context, const ResumeVoiceScreen()),
           ),
         ],
       ),
     );
   }
-
-  void _push(BuildContext context, Widget screen) =>
-      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 }
 
-// ── Choice card ───────────────────────────────────────────────────────────────
-
-class _MethodCard extends StatelessWidget {
-  final IconData icon;
+class _MethodTile extends StatelessWidget {
+  final String emoji;
   final String title;
   final String subtitle;
-  final Color color;
   final VoidCallback onTap;
 
-  const _MethodCard({
-    required this.icon,
+  const _MethodTile({
+    required this.emoji,
     required this.title,
     required this.subtitle,
-    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(icon, color: color, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface)),
+                    Text(subtitle,
                         style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                  ],
                 ),
-                Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-              ],
-            ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
           ),
         ),
       ),
@@ -223,15 +177,15 @@ Widget _submitButton({
 
 // ── Screen 1 & 2: PDF upload ─────────────────────────────────────────────────
 
-class _UploadPdfScreen extends StatefulWidget {
+class ResumeUploadPdfScreen extends StatefulWidget {
   final bool improve;
-  const _UploadPdfScreen({required this.improve});
+  const ResumeUploadPdfScreen({super.key, required this.improve});
 
   @override
-  State<_UploadPdfScreen> createState() => _UploadPdfScreenState();
+  State<ResumeUploadPdfScreen> createState() => _ResumeUploadPdfScreenState();
 }
 
-class _UploadPdfScreenState extends State<_UploadPdfScreen> {
+class _ResumeUploadPdfScreenState extends State<ResumeUploadPdfScreen> {
   String? _filePath;
   String? _fileName;
   bool _loading = false;
@@ -329,9 +283,7 @@ class _UploadPdfScreenState extends State<_UploadPdfScreen> {
                         : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: _fileName != null
-                          ? cs.primary
-                          : cs.outlineVariant,
+                      color: _fileName != null ? cs.primary : cs.outlineVariant,
                       width: _fileName != null ? 2 : 1,
                     ),
                   ),
@@ -342,9 +294,8 @@ class _UploadPdfScreenState extends State<_UploadPdfScreen> {
                             ? Icons.picture_as_pdf_rounded
                             : Icons.cloud_upload_outlined,
                         size: 40,
-                        color: _fileName != null
-                            ? cs.primary
-                            : cs.onSurfaceVariant,
+                        color:
+                            _fileName != null ? cs.primary : cs.onSurfaceVariant,
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -395,14 +346,14 @@ class _UploadPdfScreenState extends State<_UploadPdfScreen> {
 
 // ── Screen 3: Form ────────────────────────────────────────────────────────────
 
-class _FormScreen extends StatefulWidget {
-  const _FormScreen();
+class ResumeFormScreen extends StatefulWidget {
+  const ResumeFormScreen({super.key});
 
   @override
-  State<_FormScreen> createState() => _FormScreenState();
+  State<ResumeFormScreen> createState() => _ResumeFormScreenState();
 }
 
-class _FormScreenState extends State<_FormScreen> {
+class _ResumeFormScreenState extends State<ResumeFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
@@ -586,8 +537,7 @@ class _FormScreenState extends State<_FormScreen> {
               const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
         validator: required
-            ? (v) =>
-                v == null || v.trim().isEmpty ? 'Обязательное поле' : null
+            ? (v) => v == null || v.trim().isEmpty ? 'Обязательное поле' : null
             : null,
       ),
     );
@@ -596,14 +546,14 @@ class _FormScreenState extends State<_FormScreen> {
 
 // ── Screen 4: Voice ───────────────────────────────────────────────────────────
 
-class _VoiceScreen extends StatefulWidget {
-  const _VoiceScreen();
+class ResumeVoiceScreen extends StatefulWidget {
+  const ResumeVoiceScreen({super.key});
 
   @override
-  State<_VoiceScreen> createState() => _VoiceScreenState();
+  State<ResumeVoiceScreen> createState() => _ResumeVoiceScreenState();
 }
 
-class _VoiceScreenState extends State<_VoiceScreen> {
+class _ResumeVoiceScreenState extends State<ResumeVoiceScreen> {
   FlutterSoundRecorder? _recorder;
   bool _isRecorderReady = false;
   bool _isRecording = false;
@@ -735,8 +685,6 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                 style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
               ),
               const SizedBox(height: 20),
-
-              // Tips
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -776,8 +724,6 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-
-              // Record button
               Center(
                 child: GestureDetector(
                   onTap: _loading ? null : _toggleRecording,
@@ -804,8 +750,6 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-
-              // Status text
               Center(
                 child: Text(
                   _isRecording
@@ -821,8 +765,6 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                   ),
                 ),
               ),
-
-              // Loading indicator
               if (_loading) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -848,7 +790,6 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                   ),
                 ),
               ],
-
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -860,7 +801,6 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                   child: Text(_error!, style: TextStyle(color: cs.error)),
                 ),
               ],
-
               const SizedBox(height: 20),
               _submitButton(
                 onPressed:
@@ -880,8 +820,8 @@ class _VoiceScreenState extends State<_VoiceScreen> {
                   }),
                   icon: const Icon(Icons.refresh_rounded, size: 16),
                   label: const Text('Записать заново'),
-                  style: TextButton.styleFrom(
-                      foregroundColor: cs.onSurfaceVariant),
+                  style:
+                      TextButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
                 ),
               ],
             ],

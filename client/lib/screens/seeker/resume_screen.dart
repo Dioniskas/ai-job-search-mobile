@@ -42,14 +42,6 @@ class _SeekerResumeScreenState extends State<SeekerResumeScreen> {
     }
   }
 
-  Future<void> _openCreate() async {
-    final result = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const ResumeCreateScreen()),
-    );
-    if (result == true || result == null) _load();
-  }
-
   Future<void> _openDetail(Map<String, dynamic> resume) async {
     final deleted = await Navigator.push<bool>(
       context,
@@ -57,6 +49,86 @@ class _SeekerResumeScreenState extends State<SeekerResumeScreen> {
           builder: (ctx) => ResumeDetailScreen(resume: resume)),
     );
     if (deleted == true) _load();
+  }
+
+  Future<void> _pushScreen(Widget screen) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    _load();
+  }
+
+  void _showCreateSheet() {
+    final cs = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Создать резюме',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: cs.onSurface,
+                ),
+              ),
+            ),
+            _SheetOption(
+              emoji: '📄',
+              title: 'Загрузить PDF',
+              subtitle: 'Уже есть готовое резюме',
+              onTap: () {
+                Navigator.pop(ctx);
+                _pushScreen(const ResumeUploadPdfScreen(improve: false));
+              },
+            ),
+            _SheetOption(
+              emoji: '✨',
+              title: 'PDF + Ассистент',
+              subtitle: 'Загрузи PDF — Ассистент улучшит',
+              onTap: () {
+                Navigator.pop(ctx);
+                _pushScreen(const ResumeUploadPdfScreen(improve: true));
+              },
+            ),
+            _SheetOption(
+              emoji: '📝',
+              title: 'Заполнить форму',
+              subtitle: 'Ассистент составит резюме',
+              onTap: () {
+                Navigator.pop(ctx);
+                _pushScreen(const ResumeFormScreen());
+              },
+            ),
+            _SheetOption(
+              emoji: '🎤',
+              title: 'Голосом',
+              subtitle: 'Расскажи о себе — Ассистент оформит',
+              onTap: () {
+                Navigator.pop(ctx);
+                _pushScreen(const ResumeVoiceScreen());
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -79,10 +151,10 @@ class _SeekerResumeScreenState extends State<SeekerResumeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreate,
+        onPressed: _showCreateSheet,
         backgroundColor: cs.primary,
         icon: Icon(Icons.add_rounded, color: cs.onPrimary),
-        label: Text('Новое резюме', style: TextStyle(color: cs.onPrimary)),
+        label: Text('+ Создать', style: TextStyle(color: cs.onPrimary)),
       ),
       body: _loading
           ? Center(child: CircularProgressIndicator(color: cs.primary))
@@ -127,7 +199,7 @@ class _SeekerResumeScreenState extends State<SeekerResumeScreen> {
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: _openCreate,
+            onPressed: _showCreateSheet,
             icon: const Icon(Icons.add_rounded),
             label: const Text('Создать резюме'),
             style: FilledButton.styleFrom(
@@ -142,6 +214,62 @@ class _SeekerResumeScreenState extends State<SeekerResumeScreen> {
     );
   }
 }
+
+// ── Bottom sheet option row ───────────────────────────────────────────────────
+
+class _SheetOption extends StatelessWidget {
+  final String emoji;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SheetOption({
+    required this.emoji,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                size: 20, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Resume card ───────────────────────────────────────────────────────────────
 
 class _ResumeCard extends StatelessWidget {
   final Map<String, dynamic> resume;
@@ -244,8 +372,8 @@ class _ResumeCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: cs.outlineVariant),
+                            border:
+                                Border.all(color: cs.outlineVariant),
                           ),
                           child: Text(s,
                               style: TextStyle(
@@ -258,8 +386,7 @@ class _ResumeCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                if (isAi)
-                  _chip('✨ ИИ', cs.primary, cs.primaryContainer),
+                if (isAi) _chip('✨ ИИ', cs.primary, cs.primaryContainer),
                 if (resume['pdfUrl'] != null)
                   Padding(
                     padding: const EdgeInsets.only(left: 6),
@@ -268,7 +395,8 @@ class _ResumeCard extends StatelessWidget {
                   ),
                 const Spacer(),
                 Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                    size: 14,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
               ],
             ),
           ],

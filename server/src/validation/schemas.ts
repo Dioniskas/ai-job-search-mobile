@@ -28,10 +28,9 @@ export const createVacancySchema = z.object({
 });
 
 export const generateResumeTextSchema = z.object({
-  name:       z.string().min(1, 'Имя обязательно'),
-  position:   z.string().min(1, 'Должность обязательна'),
-  experience: z.string().optional(),
-  skills:     z.string().optional(),
-  education:  z.string().optional(),
+  name:       z.string().min(1, 'Укажите имя и фамилию'),
+  experience: z.string().min(1, 'Укажите опыт работы'),
+  skills:     z.string().min(1, 'Укажите навыки'),
+  age:        z.string().optional(),
   about:      z.string().optional(),
 });
