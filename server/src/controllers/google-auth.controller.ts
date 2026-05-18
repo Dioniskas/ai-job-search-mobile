@@ -17,9 +17,8 @@ export async function googleMobileAuth(req: Request, res: Response): Promise<voi
     const ticket = await client.verifyIdToken({
       idToken,
       audience: [
-        '685871848467-m1ef595poflafe15a836ibrj3hfejbjq.apps.googleusercontent.com',
-        '310538934424-ob4g36nbd2p1fl7gqdkumm45j1kbhuh9.apps.googleusercontent.com',
-        '310538934424-3282vr0l4eciq6upttgk19948slu5ta7.apps.googleusercontent.com',
+        '543184751033-9c7squ54rcf57b1spqalkhohrqug5vvp.apps.googleusercontent.com',
+        '543184751033-u2b74vsdbdhobs69gp8t337lavm0k4ve.apps.googleusercontent.com',
       ],
     });
     payload = ticket.getPayload();
