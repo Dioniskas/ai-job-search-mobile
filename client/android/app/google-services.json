@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "543184751033-6t28rbhke30f43dd30lo5i4o2aqj7bbm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aijobsearch.app",
+            "certificate_hash": "4e650e284b67873035992443c96edc9ec93c1135"
+          }
+        },
+        {
           "client_id": "543184751033-u2b74vsdbdhobs69gp8t337lavm0k4ve.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
