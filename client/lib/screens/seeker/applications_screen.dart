@@ -164,7 +164,10 @@ class _SeekerApplicationsScreenState extends State<SeekerApplicationsScreen> {
                               ),
                             );
                           }
-                          return _AppCard(app: _apps[i]);
+                          return _AppCard(
+                            app: _apps[i],
+                            onDeleted: () => setState(() => _apps.removeAt(i)),
+                          );
                         },
                       ),
                     ),
@@ -201,13 +204,59 @@ class _SeekerApplicationsScreenState extends State<SeekerApplicationsScreen> {
 
 // ── Application Card ───────────────────────────────────────────────────────────
 
-class _AppCard extends StatelessWidget {
-  const _AppCard({required this.app});
+class _AppCard extends StatefulWidget {
+  const _AppCard({required this.app, required this.onDeleted});
   final dynamic app;
+  final VoidCallback onDeleted;
+
+  @override
+  State<_AppCard> createState() => _AppCardState();
+}
+
+class _AppCardState extends State<_AppCard> {
+  bool _deleting = false;
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Отменить отклик?'),
+        content: const Text('Отклик будет удалён. Это действие нельзя отменить.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Нет'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Отменить отклик'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      await auth.withAuth((t) =>
+          ApiService.deleteApplication(t, widget.app['id'] as String));
+      if (mounted) widget.onDeleted();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _deleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final app    = widget.app;
     final status   = app['status'] as String? ?? 'PENDING';
     final vacancy  = app['vacancy'] as Map<String, dynamic>?;
     final employer = vacancy?['employer'] as Map<String, dynamic>?;
@@ -341,6 +390,27 @@ class _AppCard extends StatelessWidget {
                 Text(dateStr,
                     style: const TextStyle(color: _slate, fontSize: 11)),
             ]),
+
+            if (status == 'PENDING') ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _deleting ? null : _confirmDelete,
+                  icon: _deleting
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.close_rounded, size: 16),
+                  label: Text(_deleting ? 'Отмена...' : 'Отменить отклик'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
 
             // Status explanation
             if (status == 'VIEWED') ...[

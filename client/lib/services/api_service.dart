@@ -785,6 +785,14 @@ static Future<Map<String, dynamic>> aiImproveResumeText(String token, {
     _parse(response);
   }
 
+  static Future<void> deleteApplication(String token, String id) async {
+    final response = await _safeDelete(
+      Uri.parse('$baseUrl/api/applications/$id'),
+      headers: _headers(token: token),
+    );
+    _parse(response);
+  }
+
   // ── Saved vacancies ───────────────────────────────────────────────────────
 
   static Future<List<dynamic>> getSavedVacancies(String token) async {

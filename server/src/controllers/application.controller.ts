@@ -155,6 +155,29 @@ export async function getEmployerApplications(req: AuthRequest, res: Response): 
   }
 }
 
+// DELETE /api/applications/:id
+export async function deleteApplication(req: AuthRequest, res: Response): Promise<void> {
+  const { id } = req.params;
+
+  try {
+    const seeker = await prisma.seekerProfile.findUnique({ where: { userId: req.user!.userId } });
+    if (!seeker) { fail(res, 'Seeker profile not found'); return; }
+
+    const app = await prisma.application.findUnique({ where: { id } });
+    if (!app || app.seekerId !== seeker.id) { fail(res, 'Application not found or access denied', 404); return; }
+
+    if (app.status !== 'PENDING') {
+      fail(res, `Нельзя отменить отклик со статусом ${app.status}`, 400);
+      return;
+    }
+
+    await prisma.application.delete({ where: { id } });
+    ok(res, { deleted: true });
+  } catch (e) {
+    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+  }
+}
+
 // PATCH /api/applications/:id/status
 export async function updateApplicationStatus(req: AuthRequest, res: Response): Promise<void> {
   const { id } = req.params;

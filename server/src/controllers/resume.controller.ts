@@ -387,13 +387,11 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
     const MID       = '#334155';
     const MUTED     = '#64748B';
     const DIVIDER   = '#E2E8F0';
-
-    // ── Top accent stripe ─────────────────────────────────────────────────────
-    doc.rect(0, 0, PAGE_W, 9).fill(PRIMARY);
+    const SECTION_LABEL = '#94A3B8';
 
     // ── Header: photo left | name+title+contacts right ────────────────────────
     const PHOTO_SIZE = 88;
-    const HEADER_Y   = 22;
+    const HEADER_Y   = 28;
     const HAS_PHOTO  = !!photoBuffer;
     const TEXT_X     = HAS_PHOTO ? MARGIN + PHOTO_SIZE + 18 : MARGIN;
     const TEXT_W     = HAS_PHOTO ? CONTENT_W - PHOTO_SIZE - 18 : CONTENT_W;
@@ -442,11 +440,11 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
 
     // ── Section helpers ───────────────────────────────────────────────────────
     function sectionTitle(title: string): void {
-      setFont().fontSize(10).fillColor(PRIMARY)
+      setFont().fontSize(9).fillColor(SECTION_LABEL)
         .text(title.toUpperCase(), MARGIN, bodyY, { width: CONTENT_W, lineBreak: false });
-      bodyY += 14;
+      bodyY += 13;
       doc.moveTo(MARGIN, bodyY - 2).lineTo(PAGE_W - MARGIN, bodyY - 2)
-        .lineWidth(0.5).strokeColor('#BFDBFE').stroke();
+        .lineWidth(0.5).strokeColor(DIVIDER).stroke();
       bodyY += 6;
     }
 
