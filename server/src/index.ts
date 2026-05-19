@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes';
 import seekerRoutes from './routes/seeker.routes';
 import employerRoutes from './routes/employer.routes';
 import resumeRoutes from './routes/resume.routes';
+import { initFonts } from './controllers/resume.controller';
 import vacancyRoutes from './routes/vacancy.routes';
 import aiRoutes from './routes/ai.routes';
 import skillsRoutes from './routes/skills.routes';
@@ -88,6 +89,7 @@ app.get('/health', (_req, res) => {
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  initFonts().catch(() => {});
 });
 
 export { httpServer };

@@ -17,10 +17,13 @@ import {
 } from '../services/ai/groq.service';
 
 // ── Font discovery for Cyrillic support ───────────────────────────────────────
+const DEJAVU_LOCAL = nodePath.join(process.cwd(), 'fonts', 'DejaVuSans.ttf');
+const DEJAVU_URL   = 'https://github.com/dejavu-fonts/dejavu-fonts/raw/version_2_37/ttf/DejaVuSans.ttf';
+
 function findCyrillicFont(): string | undefined {
   const candidates = [
+    DEJAVU_LOCAL,
     nodePath.join(process.cwd(), 'fonts', 'FreeSans.ttf'),
-    nodePath.join(process.cwd(), 'fonts', 'DejaVuSans.ttf'),
     // Railway / Debian
     '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
     '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
@@ -36,6 +39,25 @@ function findCyrillicFont(): string | undefined {
     'C:\\Windows\\Fonts\\times.ttf',
   ];
   return candidates.find(p => fs.existsSync(p));
+}
+
+export async function initFonts(): Promise<void> {
+  if (fs.existsSync(DEJAVU_LOCAL)) return;
+  if (findCyrillicFont()) return; // system font found, no need to download
+
+  try {
+    const fontsDir = nodePath.join(process.cwd(), 'fonts');
+    if (!fs.existsSync(fontsDir)) fs.mkdirSync(fontsDir, { recursive: true });
+
+    console.log('[fonts] Downloading DejaVuSans.ttf...');
+    const resp = await fetch(DEJAVU_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = Buffer.from(await resp.arrayBuffer());
+    fs.writeFileSync(DEJAVU_LOCAL, buf);
+    console.log('[fonts] DejaVuSans.ttf saved to', DEJAVU_LOCAL);
+  } catch (e) {
+    console.warn('[fonts] Could not download DejaVuSans.ttf:', e instanceof Error ? e.message : e);
+  }
 }
 
 async function getOrCreateProfile(userId: string) {

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +23,7 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
   bool _scoring = false;
   bool _settingMain = false;
   bool _downloadingPdf = false;
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -111,6 +113,22 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
     if (updated == true) await _refresh();
   }
 
+  Future<void> _pickAndUploadPhoto() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (picked == null) return;
+    setState(() => _uploadingPhoto = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      await auth.withAuth((t) => ApiService.uploadResumePhoto(t, _resume['id'] as String, File(picked.path)));
+      await _refresh();
+      _showSnack('✅ Фото обновлено');
+    } catch (e) {
+      _showSnack('Ошибка: $e');
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
   Future<void> _downloadPdf() async {
     setState(() => _downloadingPdf = true);
     try {
@@ -186,20 +204,51 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
                   children: [
                     const SizedBox(height: 60),
                     // Photo
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: cs.primaryContainer,
-                        border: Border.all(color: cs.primary, width: 3),
-                        image: photoUrl != null
-                            ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
-                            : null,
+                    GestureDetector(
+                      onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: cs.primaryContainer,
+                              border: Border.all(color: cs.primary, width: 3),
+                              image: photoUrl != null
+                                  ? DecorationImage(image: NetworkImage(photoUrl), fit: BoxFit.cover)
+                                  : null,
+                            ),
+                            child: photoUrl == null
+                                ? Icon(Icons.person_rounded, size: 50, color: cs.primary)
+                                : null,
+                          ),
+                          if (_uploadingPhoto)
+                            const Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0x66000000),
+                                ),
+                                child: Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                              ),
+                            ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: cs.primary,
+                                border: Border.all(color: cs.surface, width: 2),
+                              ),
+                              child: Icon(Icons.camera_alt_rounded, size: 14, color: cs.onPrimary),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: photoUrl == null
-                          ? Icon(Icons.person_rounded, size: 50, color: cs.primary)
-                          : null,
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -238,36 +287,44 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
               child: Column(
                 children: [
                   // Action buttons
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: _actionBtn(
-                          cs,
-                          icon: Icons.star_rounded,
-                          label: isMain ? 'Основное' : 'Сделать основным',
-                          loading: _settingMain,
-                          onTap: isMain ? null : _setMain,
-                          active: isMain,
+                      if (!isMain) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: _settingMain ? null : _setMain,
+                            icon: _settingMain
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.star_rounded),
+                            label: const Text('Сделать основным'),
+                            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: _downloadingPdf ? null : _downloadPdf,
+                          icon: _downloadingPdf
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.picture_as_pdf_rounded),
+                          label: const Text('Скачать PDF'),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _actionBtn(
-                          cs,
-                          icon: Icons.picture_as_pdf_rounded,
-                          label: 'Скачать PDF',
-                          loading: _downloadingPdf,
-                          onTap: _downloadPdf,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _actionBtn(
-                          cs,
-                          icon: Icons.auto_awesome_rounded,
-                          label: 'Оценить ИИ',
-                          loading: _scoring,
-                          onTap: _score,
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: _scoring ? null : _score,
+                          icon: _scoring
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.auto_awesome_rounded),
+                          label: const Text('Оценить резюме'),
                         ),
                       ),
                     ],
@@ -343,7 +400,7 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
                     const SizedBox(height: 12),
                     _buildSection(
                       cs, isDark,
-                      title: 'Оценка ИИ',
+                      title: 'Оценка Ассистента',
                       icon: Icons.auto_awesome_rounded,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,47 +450,6 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
   bool _notEmpty(dynamic val) => val != null && (val as String).isNotEmpty;
   bool _hasContacts(Map<String, dynamic> content) {
     return _notEmpty(content['phone']) || _notEmpty(content['city']) || _notEmpty(content['email']);
-  }
-
-  Widget _actionBtn(ColorScheme cs, {
-    required IconData icon,
-    required String label,
-    bool loading = false,
-    VoidCallback? onTap,
-    bool active = false,
-  }) {
-    return Material(
-      color: active ? cs.primary : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (loading)
-                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: active ? cs.onPrimary : cs.primary))
-              else
-                Icon(icon, size: 18, color: active ? cs.onPrimary : cs.primary),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: active ? cs.onPrimary : cs.onSurface,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildSection(ColorScheme cs, bool isDark, {
