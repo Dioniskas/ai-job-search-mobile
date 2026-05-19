@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -569,6 +570,19 @@ class _ResumeVoiceScreenState extends State<ResumeVoiceScreen> {
   }
 
   Future<void> _initRecorder() async {
+    // Запрашиваем разрешение на микрофон
+    final status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      if (mounted) {
+        setState(() => _error =
+            'Нет доступа к микрофону. Разрешите доступ в настройках телефона.');
+        if (status.isPermanentlyDenied) {
+          openAppSettings();
+        }
+      }
+      return;
+    }
+
     final rec = FlutterSoundRecorder();
     try {
       await rec.openRecorder();
@@ -580,8 +594,11 @@ class _ResumeVoiceScreenState extends State<ResumeVoiceScreen> {
       });
       _recorder = rec;
       if (mounted) setState(() => _isRecorderReady = true);
-    } catch (_) {
+    } catch (e) {
       await rec.closeRecorder();
+      if (mounted) {
+        setState(() => _error = 'Ошибка инициализации микрофона: $e');
+      }
     }
   }
 

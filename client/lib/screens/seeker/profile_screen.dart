@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -136,7 +137,10 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
       final bytes = await image.readAsBytes();
       final url = await _auth.withAuth(
           (t) => ApiService.uploadSeekerPhoto(t, bytes, image.name));
-      if (mounted) setState(() => _photoUrl = url);
+      if (mounted) {
+        await CachedNetworkImage.evictFromCache(_photoUrl ?? '');
+        setState(() => _photoUrl = '$url?t=${DateTime.now().millisecondsSinceEpoch}');
+      }
     } catch (e) {
       if (mounted) _showSnack('Ошибка загрузки фото: $e', isError: true);
     } finally {
