@@ -18,7 +18,7 @@ class _CacheEntry {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.107:5000';
+  static const String baseUrl = 'https://ai-job-search-mobile-production.up.railway.app';
   static const _timeout = Duration(seconds: 15);
 
   // ── In-memory cache ────────────────────────────────────────────────────────
