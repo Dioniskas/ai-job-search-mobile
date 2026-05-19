@@ -62,7 +62,7 @@ export async function uploadPhoto(req: AuthRequest, res: Response): Promise<void
       req.file.buffer,
       req.file.mimetype,
       'ai-job-search/avatars',
-      `seeker-${req.user!.userId}`
+      `seeker-${req.user!.userId}-${Date.now()}`
     );
 
     const profile = await prisma.seekerProfile.upsert({

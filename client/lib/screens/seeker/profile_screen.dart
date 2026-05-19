@@ -107,7 +107,8 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
       if (!mounted) return;
       final p = profileData['profile'] as Map<String, dynamic>?;
       setState(() {
-        _photoUrl = p?['photoUrl'] as String?;
+        final rawUrl = p?['photoUrl'] as String?;
+        _photoUrl = rawUrl != null ? '$rawUrl?t=${DateTime.now().millisecondsSinceEpoch}' : null;
         _isVisible = (p?['isVisible'] as bool?) ?? true;
         _searchStatus = (p?['searchStatus'] as String?) ?? 'ACTIVE';
         final fn = (p?['firstName'] as String?) ?? '';
