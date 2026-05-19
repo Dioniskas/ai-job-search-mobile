@@ -119,7 +119,8 @@ class _ResumeDetailScreenState extends State<ResumeDetailScreen> {
     setState(() => _uploadingPhoto = true);
     try {
       final auth = context.read<AuthProvider>();
-      await auth.withAuth((t) => ApiService.uploadResumePhoto(t, _resume['id'] as String, File(picked.path)));
+      final bytes = await picked.readAsBytes();
+      await auth.withAuth((t) => ApiService.uploadResumePhoto(t, _resume['id'] as String, bytes, picked.name));
       await _refresh();
       _showSnack('✅ Фото обновлено');
     } catch (e) {

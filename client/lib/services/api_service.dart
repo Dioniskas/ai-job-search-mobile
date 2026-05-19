@@ -217,12 +217,17 @@ static Future<Map<String, dynamic>> updateResume(String token, String id, Map<St
   return _parse(response);
 }
 
-static Future<void> uploadResumePhoto(String token, String resumeId, File photo) async {
+static Future<void> uploadResumePhoto(String token, String resumeId, Uint8List bytes, String fileName) async {
   final uri = Uri.parse('$baseUrl/api/resume/$resumeId/photo');
   final request = http.MultipartRequest('POST', uri);
   request.headers['Authorization'] = 'Bearer $token';
-  request.files.add(await http.MultipartFile.fromPath('photo', photo.path));
-  await request.send();
+  request.files.add(http.MultipartFile.fromBytes(
+    'photo', bytes,
+    filename: fileName,
+    contentType: MediaType('image', 'jpeg'),
+  ));
+  final response = await request.send();
+  if (response.statusCode != 200) throw Exception('Ошибка загрузки фото');
 }
 
   static Future<Map<String, dynamic>> register(
