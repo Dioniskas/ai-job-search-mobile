@@ -171,23 +171,143 @@ class _MyAppState extends State<MyApp> {
   }
 
   ThemeData _buildTheme(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF2563EB),
+      brightness: brightness,
+    );
+
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF2563EB),
-        brightness: brightness,
-      ),
+      colorScheme: colorScheme,
       useMaterial3: true,
       fontFamily: 'Roboto',
+
+      // Карточки
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA),
+            width: 1,
+          ),
+        ),
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+      ),
+
+      // AppBar
+      appBarTheme: AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        foregroundColor: isDark ? Colors.white : Colors.black,
+        titleTextStyle: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : Colors.black,
+          fontFamily: 'Roboto',
+        ),
+      ),
+
+      // Scaffold
+      scaffoldBackgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7),
+
+      // Кнопки
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          side: const BorderSide(color: Color(0xFF2563EB)),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+
+      // Поля ввода
       inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
         ),
-        filled: true,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      navigationBarTheme: const NavigationBarThemeData(
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+
+      // Chip
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E5EA),
+        ),
+        backgroundColor: isDark ? const Color(0xFF2C2C2E) : Colors.white,
+        labelStyle: TextStyle(
+          fontSize: 14,
+          color: isDark ? Colors.white : Colors.black,
+        ),
+      ),
+
+      // Bottom Navigation
+      navigationBarTheme: NavigationBarThemeData(
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        indicatorColor: Colors.transparent,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected
+                ? (isDark ? Colors.white : Colors.black)
+                : const Color(0xFF9E9E9E),
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected
+                ? (isDark ? Colors.white : Colors.black)
+                : const Color(0xFF9E9E9E),
+            size: 24,
+          );
+        }),
+      ),
+
+      // Divider
+      dividerTheme: DividerThemeData(
+        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA),
+        thickness: 1,
+        space: 1,
       ),
     );
   }
