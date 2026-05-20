@@ -134,7 +134,9 @@ class _ResumeEditScreenState extends State<ResumeEditScreen> {
 
       // Upload photo if selected
       if (_newPhoto != null) {
-        await auth.withAuth((t) => ApiService.uploadResumePhoto(t, id, _newPhoto!));
+        final bytes = await _newPhoto!.readAsBytes();
+        final name = _newPhoto!.path.split('/').last;
+        await auth.withAuth((t) => ApiService.uploadResumePhoto(t, id, bytes, name));
       }
 
       if (!mounted) return;

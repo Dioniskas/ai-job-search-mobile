@@ -541,7 +541,9 @@ class _ResumeFormScreenState extends State<ResumeFormScreen> {
       if (_photo != null && mounted) {
         final id = resume['id']?.toString() ?? '';
         if (id.isNotEmpty) {
-          await ApiService.uploadResumePhoto(token, id, _photo!);
+          final bytes = await _photo!.readAsBytes();
+          final name = _photo!.path.split('/').last;
+          await ApiService.uploadResumePhoto(token, id, bytes, name);
         }
       }
 
