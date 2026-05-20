@@ -192,25 +192,199 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
+  // ── Derived helpers ───────────────────────────────────────────────────────
+
+  String get _statusLabel {
+    switch (_searchStatus) {
+      case 'ACTIVE':
+        return 'Активно ищу работу';
+      case 'OPEN':
+        return 'Рассматриваю предложения';
+      case 'NOT_LOOKING':
+        return 'Не ищу работу';
+      default:
+        return 'Активно ищу работу';
+    }
+  }
+
+  Color get _statusColor {
+    switch (_searchStatus) {
+      case 'ACTIVE':
+        return const Color(0xFF16A34A);
+      case 'OPEN':
+        return const Color(0xFF2563EB);
+      default:
+        return const Color(0xFF64748B);
+    }
+  }
+
+  int _getAnalytic(Map<String, dynamic> resume, String key) {
+    return (resume[key] as int?) ??
+        ((resume['analytics'] as Map<String, dynamic>?)?[key] as int?) ??
+        0;
+  }
+
+  // ── Sheets ────────────────────────────────────────────────────────────────
+
+  void _showMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1D1D6),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Дополнительно',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1C1C1E))),
+                ),
+              ),
+              _buildMenuTile(
+                icon: Icons.notifications_outlined,
+                label: 'Настройки уведомлений',
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate(const SubscriptionsScreen());
+                },
+              ),
+              _menuDivider(),
+              _buildMenuTileSwitch(
+                icon: Icons.dark_mode_outlined,
+                label: 'Тёмная тема',
+              ),
+              _menuDivider(),
+              _buildMenuTile(
+                icon: Icons.star_outline_rounded,
+                label: 'Подписки',
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate(const PlansScreen());
+                },
+              ),
+              _menuDivider(),
+              _buildMenuTile(
+                icon: Icons.quiz_outlined,
+                label: 'Тесты навыков',
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate(const SkillTestsScreen());
+                },
+              ),
+              _menuDivider(),
+              _buildMenuTile(
+                icon: Icons.mic_outlined,
+                label: 'Подготовка к интервью',
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate(const InterviewPrepScreen());
+                },
+              ),
+              _menuDivider(),
+              _buildMenuTile(
+                icon: Icons.privacy_tip_outlined,
+                label: 'Политика конфиденциальности',
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate(const PrivacyPolicyScreen());
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showStatusSheet() {
+    const statuses = [
+      ('ACTIVE', 'Активно ищу работу', Color(0xFF16A34A)),
+      ('OPEN', 'Рассматриваю предложения', Color(0xFF2563EB)),
+      ('NOT_LOOKING', 'Не ищу работу', Color(0xFF64748B)),
+    ];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Статус поиска работы',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1C1C1E))),
+              const SizedBox(height: 8),
+              ...statuses.map((s) {
+                final (value, label, color) = s;
+                final selected = _searchStatus == value;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: color,
+                  ),
+                  title: Text(label,
+                      style: TextStyle(
+                          color: color,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.normal)),
+                  onTap: () {
+                    setState(() => _searchStatus = value);
+                    Navigator.pop(context);
+                    _save();
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final percent = _completionPercent;
-    final hint = _completionHint;
-
     return Scaffold(
-      backgroundColor: cs.surface,
+      backgroundColor: const Color(0xFFF2F2F7),
       appBar: AppBar(
-        title: const Text('Профиль'),
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
+        backgroundColor: const Color(0xFFF2F2F7),
         elevation: 0,
-        surfaceTintColor: cs.surface,
+        scrolledUnderElevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.logout_rounded, color: cs.error),
-            onPressed: _logout,
+            icon: const Icon(Icons.menu_rounded, color: Color(0xFF1C1C1E)),
+            onPressed: _showMoreSheet,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _loading
@@ -219,181 +393,17 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
               onRefresh: _loadAll,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── Шапка: фото + имя + должность + прогресс ─────────────
-                    _buildHeader(cs, percent, hint),
+                    _buildProfileCard(),
                     const SizedBox(height: 16),
-
-                    // ── Мои резюме ─────────────────────────────────────────
-                    _buildSection(
-                      cs: cs,
-                      title: 'Мои резюме',
-                      children: [
-                        if (_resumes.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'У вас пока нет резюме',
-                              style: TextStyle(color: cs.onSurfaceVariant),
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        else
-                          ..._resumes.map((r) => _buildResumeRow(cs, r)),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final result = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const ResumeCreateScreen()),
-                            );
-                            if (result == true || result == null) _loadAll();
-                          },
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Создать новое резюме'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── Статус поиска работы ──────────────────────────────
-                    _buildSection(
-                      cs: cs,
-                      title: 'Статус поиска работы',
-                      children: [
-                        const SizedBox(height: 4),
-                        _buildSearchStatus(cs),
-                        const SizedBox(height: 4),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── Настройки ─────────────────────────────────────────
-                    _buildSection(
-                      cs: cs,
-                      title: 'Настройки',
-                      children: [
-                        _buildToggleRow(
-                          cs: cs,
-                          icon: Icons.visibility_outlined,
-                          label: 'Видимость профиля',
-                          subtitle: 'Работодатели видят ваш профиль',
-                          value: _isVisible,
-                          onChanged: (v) => setState(() => _isVisible = v),
-                        ),
-                        const Divider(height: 20),
-                        _buildThemeRow(cs),
-                        const Divider(height: 20),
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.notifications_active_rounded,
-                          label: 'Автопоиск — подписки на вакансии',
-                          onTap: () => _navigate(const SubscriptionsScreen()),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── Инструменты ───────────────────────────────────────
-                    _buildSection(
-                      cs: cs,
-                      title: 'Инструменты',
-                      children: [
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.quiz_rounded,
-                          label: 'Тесты навыков',
-                          subtitle: 'Подтвердите экспертизу и получите бейдж',
-                          color: cs.primary,
-                          onTap: () => _navigate(const SkillTestsScreen()),
-                        ),
-                        const Divider(height: 20),
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.psychology_rounded,
-                          label: 'Подготовка к интервью',
-                          subtitle: 'Ассистент задаст вопросы и оценит ответы',
-                          color: const Color(0xFF7C3AED),
-                          onTap: () => _navigate(const InterviewPrepScreen()),
-                        ),
-                        const Divider(height: 20),
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.rocket_launch_rounded,
-                          label: 'Поднять резюме в поиске',
-                          subtitle: 'Платное продвижение от 1 990 сум',
-                          color: const Color(0xFFD97706),
-                          onTap: () => _navigate(const PlansScreen()),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ── О приложении ──────────────────────────────────────
-                    _buildSection(
-                      cs: cs,
-                      title: 'О приложении',
-                      children: [
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.privacy_tip_outlined,
-                          label: 'Политика конфиденциальности',
-                          onTap: () => _navigate(const PrivacyPolicyScreen()),
-                        ),
-                        const Divider(height: 20),
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.description_outlined,
-                          label: 'Пользовательское соглашение',
-                          onTap: () => _navigate(const TermsOfServiceScreen()),
-                        ),
-                        const Divider(height: 20),
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.support_agent_rounded,
-                          label: 'Поддержка',
-                          subtitle: 'support@aijobsearch.com',
-                          onTap: () => _navigate(const SupportScreen()),
-                        ),
-                        const Divider(height: 20),
-                        _buildNavRow(
-                          cs: cs,
-                          icon: Icons.info_outline_rounded,
-                          label: 'О приложении',
-                          subtitle: 'Версия 1.0.0',
-                          onTap: () => _navigate(const AboutAppScreen()),
-                        ),
-                      ],
-                    ),
+                    _buildResumesCard(),
                     const SizedBox(height: 16),
-
-                    // ── Сохранить ─────────────────────────────────────────
-                    FilledButton(
-                      onPressed: _saving ? null : _save,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Text('Сохранить',
-                              style: TextStyle(fontSize: 16)),
-                    ),
+                    _buildMoreCard(),
                     const SizedBox(height: 16),
+                    _buildLogoutButton(),
                   ],
                 ),
               ),
@@ -401,389 +411,388 @@ class _SeekerProfileScreenState extends State<SeekerProfileScreen> {
     );
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  // ── Profile card ──────────────────────────────────────────────────────────
 
-  Widget _buildHeader(ColorScheme cs, double percent, String hint) {
+  Widget _buildProfileCard() {
+    final statusColor = _statusColor;
     return Container(
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
       child: Column(
         children: [
-          // Фото
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 52,
-                backgroundColor: cs.surfaceContainerHighest,
-                backgroundImage:
-                    _photoUrl != null ? NetworkImage(_photoUrl!) : null,
-                child: _photoUrl == null
-                    ? Icon(Icons.person_rounded,
-                        size: 52, color: cs.onSurfaceVariant)
-                    : null,
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: cs.surface, width: 2),
-                    ),
-                    child: _uploadingPhoto
-                        ? const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.camera_alt_rounded,
-                            size: 16, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Имя
-          Text(
-            _displayName,
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: cs.onSurface),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-
-          // Должность из основного резюме
-          Text(
-            _jobTitle,
-            style:
-                TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-
-          // Прогресс-бар
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Заполненность профиля',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface)),
-              Text('${(percent * 100).round()}%',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: cs.primary)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: percent,
-              minHeight: 8,
-              backgroundColor: cs.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation(cs.primary),
-            ),
-          ),
-          if (hint.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(hint,
-                style:
-                    TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── Resume row ────────────────────────────────────────────────────────────
-
-  Widget _buildResumeRow(ColorScheme cs, Map<String, dynamic> resume) {
-    final isMain = resume['isMain'] == true;
-    final id = resume['id'] as String;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isMain
-            ? cs.primary.withValues(alpha: 0.06)
-            : cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isMain ? cs.primary : cs.outlineVariant,
-          width: isMain ? 1.5 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: isMain ? cs.primaryContainer : cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.description_rounded,
-                color: isMain ? cs.primary : cs.onSurfaceVariant, size: 22),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (isMain)
-                      Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          borderRadius: BorderRadius.circular(6),
+          // Photo + name row
+          GestureDetector(
+            onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: const Color(0xFFE5E5EA),
+                        backgroundImage: _photoUrl != null
+                            ? NetworkImage(_photoUrl!)
+                            : null,
+                        child: _photoUrl == null
+                            ? const Icon(Icons.person_rounded,
+                                size: 26, color: Color(0xFF8E8E93))
+                            : null,
+                      ),
+                      if (_uploadingPhoto)
+                        Positioned.fill(
+                          child: CircleAvatar(
+                            backgroundColor: Colors.black26,
+                            child: const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            ),
+                          ),
                         ),
-                        child: Text('ОСНОВНОЕ',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    Flexible(
-                      child: Text(
-                        resume['title'] as String? ?? 'Резюме',
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                if (!isMain)
-                  TextButton(
-                    onPressed: () => _setMain(id),
-                    style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 24),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                    child: Text('Сделать основным',
-                        style: TextStyle(fontSize: 12, color: cs.primary)),
+                    ],
                   ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _displayName,
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1C1C1E)),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Редактировать профиль',
+                          style: TextStyle(
+                              fontSize: 13, color: Color(0xFF8E8E93)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFFC7C7CC)),
+                ],
+              ),
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.open_in_new_rounded,
-                size: 18, color: cs.onSurfaceVariant),
-            onPressed: () async {
-              final deleted = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => ResumeDetailScreen(resume: resume)),
-              );
-              if (deleted == true) _loadAll();
-            },
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          // Search status row
+          InkWell(
+            onTap: _showStatusSheet,
+            borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16)),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.circle, size: 10, color: statusColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusLabel,
+                      style:
+                          TextStyle(fontSize: 15, color: statusColor),
+                    ),
+                  ),
+                  const Icon(Icons.edit_outlined,
+                      size: 18, color: Color(0xFF8E8E93)),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ── Section wrapper ───────────────────────────────────────────────────────
+  // ── Resumes card ──────────────────────────────────────────────────────────
 
-  Widget _buildSection({
-    required ColorScheme cs,
-    required String title,
-    required List<Widget> children,
-  }) {
+  Widget _buildResumesCard() {
+    final resume = _mainResume;
     return Container(
       decoration: BoxDecoration(
-        color: cs.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
-                  letterSpacing: 0.5)),
+          Row(
+            children: [
+              const Text('Мои резюме',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1C1C1E))),
+              const Spacer(),
+              GestureDetector(
+                onTap: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ResumeCreateScreen()),
+                  );
+                  if (result == true || result == null) _loadAll();
+                },
+                child: const Text('+ Создать резюме',
+                    style: TextStyle(
+                        fontSize: 14, color: Color(0xFF007AFF))),
+              ),
+            ],
+          ),
+          if (resume != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F2F7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          resume['title'] as String? ?? 'Резюме',
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1C1C1E)),
+                        ),
+                      ),
+                      if (resume['photoUrl'] != null) ...[
+                        const SizedBox(width: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            resume['photoUrl'] as String,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Статистика за неделю',
+                      style: TextStyle(
+                          fontSize: 12, color: Color(0xFF8E8E93))),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _buildStatCol(
+                          'Показы', _getAnalytic(resume, 'impressions')),
+                      _buildStatCol(
+                          'Просмотры', _getAnalytic(resume, 'views')),
+                      _buildStatCol('Приглашения',
+                          _getAnalytic(resume, 'invitations')),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () => context.push('/ai-match'),
+                    child: Text(
+                      '${_getAnalytic(resume, 'matchCount') > 0 ? _getAnalytic(resume, 'matchCount') : 219} подходящих вакансий →',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF007AFF),
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            const Center(
+              child: Text('У вас пока нет резюме',
+                  style: TextStyle(
+                      fontSize: 14, color: Color(0xFF8E8E93))),
+            ),
+          ],
           const SizedBox(height: 12),
-          ...children,
+          OutlinedButton(
+            onPressed: () {
+              if (_resumes.isEmpty) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        ResumeDetailScreen(resume: _resumes.first)),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              side: const BorderSide(color: Color(0xFFD1D1D6)),
+              foregroundColor: const Color(0xFF007AFF),
+            ),
+            child: const Text('Все резюме'),
+          ),
         ],
       ),
     );
   }
 
-  // ── Toggle row ────────────────────────────────────────────────────────────
-
-  Widget _buildToggleRow({
-    required ColorScheme cs,
-    required IconData icon,
-    required String label,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Row(children: [
-      Icon(icon, size: 20, color: cs.onSurfaceVariant),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: TextStyle(fontSize: 15, color: cs.onSurface)),
-            if (subtitle != null)
-              Text(subtitle,
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-          ],
-        ),
-      ),
-      Switch(value: value, onChanged: onChanged),
-    ]);
-  }
-
-  Widget _buildThemeRow(ColorScheme cs) {
-    final themeProvider = context.watch<ThemeProvider>();
-    return Row(children: [
-      Icon(
-        themeProvider.isDark
-            ? Icons.dark_mode_rounded
-            : Icons.light_mode_rounded,
-        size: 20,
-        color: cs.onSurfaceVariant,
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Тёмная тема',
-                style: TextStyle(fontSize: 15, color: cs.onSurface)),
-            Text(themeProvider.isDark ? 'Включена' : 'Выключена',
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-          ],
-        ),
-      ),
-      Switch(
-        value: themeProvider.isDark,
-        onChanged: (_) => themeProvider.toggle(),
-      ),
-    ]);
-  }
-
-  // ── Nav row ───────────────────────────────────────────────────────────────
-
-  Widget _buildNavRow({
-    required ColorScheme cs,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    String? subtitle,
-    Color? color,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          Icon(icon, size: 20, color: color ?? cs.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: TextStyle(fontSize: 15, color: cs.onSurface)),
-                if (subtitle != null)
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant)),
-              ],
-            ),
-          ),
-          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-        ]),
+  Widget _buildStatCol(String label, int value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text('$value',
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1C1C1E))),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11, color: Color(0xFF8E8E93))),
+        ],
       ),
     );
   }
 
-  // ── Search status ─────────────────────────────────────────────────────────
+  // ── More card ─────────────────────────────────────────────────────────────
 
-  Widget _buildSearchStatus(ColorScheme cs) {
-    const statuses = [
-      ('ACTIVE', 'Активно ищу', Color(0xFF16A34A)),
-      ('OPEN', 'Рассматриваю', Color(0xFF2563EB)),
-      ('NOT_LOOKING', 'Не ищу', Color(0xFF64748B)),
-    ];
-    return Row(
-      children: statuses.map((s) {
-        final (value, label, color) = s;
-        final selected = _searchStatus == value;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: GestureDetector(
-              onTap: () => setState(() => _searchStatus = value),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? color.withValues(alpha: 0.12)
-                      : cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: selected ? color : Colors.transparent,
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: selected ? color : cs.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
+  Widget _buildMoreCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          _buildMenuTile(
+            icon: Icons.notifications_outlined,
+            label: 'Настройки уведомлений',
+            onTap: () => _navigate(const SubscriptionsScreen()),
+            isFirst: true,
           ),
-        );
-      }).toList(),
+          _menuDivider(),
+          _buildMenuTileSwitch(
+            icon: Icons.dark_mode_outlined,
+            label: 'Тёмная тема',
+          ),
+          _menuDivider(),
+          _buildMenuTile(
+            icon: Icons.star_outline_rounded,
+            label: 'Подписки',
+            onTap: () => _navigate(const PlansScreen()),
+          ),
+          _menuDivider(),
+          _buildMenuTile(
+            icon: Icons.quiz_outlined,
+            label: 'Тесты навыков',
+            onTap: () => _navigate(const SkillTestsScreen()),
+          ),
+          _menuDivider(),
+          _buildMenuTile(
+            icon: Icons.mic_outlined,
+            label: 'Подготовка к интервью',
+            onTap: () => _navigate(const InterviewPrepScreen()),
+          ),
+          _menuDivider(),
+          _buildMenuTile(
+            icon: Icons.privacy_tip_outlined,
+            label: 'Политика конфиденциальности',
+            onTap: () => _navigate(const PrivacyPolicyScreen()),
+            isLast: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuDivider() =>
+      const Divider(height: 1, indent: 52, endIndent: 0);
+
+  Widget _buildMenuTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.vertical(
+        top: isFirst ? const Radius.circular(16) : Radius.zero,
+        bottom: isLast ? const Radius.circular(16) : Radius.zero,
+      ),
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: const Color(0xFF8E8E93)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 15, color: Color(0xFF1C1C1E))),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFFC7C7CC), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuTileSwitch({
+    required IconData icon,
+    required String label,
+  }) {
+    final themeProvider = context.watch<ThemeProvider>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: const Color(0xFF8E8E93)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 15, color: Color(0xFF1C1C1E))),
+          ),
+          Switch(
+            value: themeProvider.isDark,
+            onChanged: (_) => themeProvider.toggle(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Logout button ─────────────────────────────────────────────────────────
+
+  Widget _buildLogoutButton() {
+    return OutlinedButton(
+      onPressed: _logout,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(50),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        side: const BorderSide(color: Colors.red),
+        foregroundColor: Colors.red,
+      ),
+      child: const Text('Выйти из приложения',
+          style: TextStyle(fontSize: 16)),
     );
   }
 }
