@@ -19,9 +19,9 @@ class _CacheEntry {
 
 class ApiService {
   static const String baseUrl = 'https://ai-job-search-mobile-production.up.railway.app';
-  static const _timeout = Duration(seconds: 30);
-  static const _maxRetries = 3;
-  static const _retryDelay = Duration(seconds: 2);
+  static const _timeout = Duration(seconds: 15);
+  static const _maxRetries = 2;
+  static const _retryDelay = Duration(seconds: 1);
 
   // ── In-memory cache ────────────────────────────────────────────────────────
   static final Map<String, _CacheEntry> _cache = {};
