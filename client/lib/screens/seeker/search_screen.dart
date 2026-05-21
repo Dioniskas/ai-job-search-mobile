@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import 'vacancy_detail_screen.dart';
@@ -72,13 +73,10 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
 
   String _selectedCategory = 'all';
 
-  Timer? _debounce;
-
   @override
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
-    _searchCtrl.addListener(_onSearchChanged);
 
     final cached = ApiService.getCachedVacanciesPage(null, 1);
     if (cached != null) {
@@ -91,8 +89,6 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
@@ -104,13 +100,6 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
         _scrollCtrl.position.maxScrollExtent - 200) {
       _loadMore();
     }
-  }
-
-  void _onSearchChanged() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _loadVacancies(reset: true);
-    });
   }
 
   AuthProvider get _auth => context.read<AuthProvider>();
@@ -191,6 +180,26 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
     _loadVacancies(reset: true);
   }
 
+  void _applySearch(String query) {
+    _searchCtrl.text = query;
+    _loadVacancies(reset: true);
+  }
+
+  void _openSearchSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _SearchSheet(
+        initialQuery: _searchCtrl.text,
+        onSearch: _applySearch,
+      ),
+    );
+  }
+
   Future<void> _openFilters() async {
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
@@ -237,23 +246,30 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
             child: Column(children: [
               Row(children: [
                 Expanded(
-                  child: TextField(
-                    controller: _searchCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Должность, компания...',
-                      hintStyle: TextStyle(
-                          color: Color(0xFF9E9E9E), fontSize: 15),
-                      prefixIcon: Icon(Icons.search_rounded,
-                          color: Color(0xFF9E9E9E), size: 22),
-                      contentPadding: EdgeInsets.symmetric(vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                        borderSide: BorderSide.none,
+                  child: GestureDetector(
+                    onTap: _openSearchSheet,
+                    child: IgnorePointer(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          hintText: 'Должность, компания...',
+                          hintStyle: TextStyle(
+                              color: Color(0xFF9E9E9E), fontSize: 15),
+                          prefixIcon: Icon(Icons.search_rounded,
+                              color: Color(0xFF9E9E9E), size: 22),
+                          contentPadding:
+                              EdgeInsets.symmetric(vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(12)),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Color(0xFFF2F2F7),
+                        ),
                       ),
-                      filled: true,
-                      fillColor: Color(0xFFF2F2F7),
                     ),
-                    onSubmitted: (_) => _loadVacancies(reset: true),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -648,6 +664,184 @@ class _VacancyCard extends StatelessWidget {
                 color: color,
                 fontSize: 13,
                 fontWeight: FontWeight.w500)),
+      );
+}
+
+// ── Search Sheet ───────────────────────────────────────────────────────────────
+
+class _SearchSheet extends StatefulWidget {
+  const _SearchSheet({
+    required this.initialQuery,
+    required this.onSearch,
+  });
+  final String initialQuery;
+  final void Function(String) onSearch;
+
+  @override
+  State<_SearchSheet> createState() => _SearchSheetState();
+}
+
+class _SearchSheetState extends State<_SearchSheet> {
+  final _ctrl = TextEditingController();
+  List<String> _history = [];
+  List<String> _suggestions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.text = widget.initialQuery;
+    _ctrl.addListener(_onChanged);
+    _loadHistory();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.removeListener(_onChanged);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList('search_history') ?? [];
+    if (!mounted) return;
+    setState(() {
+      _history = list;
+      _suggestions = _filter(_ctrl.text);
+    });
+  }
+
+  List<String> _filter(String q) {
+    if (q.isEmpty) return _history.take(5).toList();
+    return _history
+        .where((h) => h.toLowerCase().contains(q.toLowerCase()))
+        .take(5)
+        .toList();
+  }
+
+  void _onChanged() => setState(() => _suggestions = _filter(_ctrl.text));
+
+  Future<void> _submit(String query) async {
+    query = query.trim();
+    if (query.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList('search_history') ?? [];
+    list.remove(query);
+    list.insert(0, query);
+    if (list.length > 20) list.removeLast();
+    await prefs.setStringList('search_history', list);
+    if (!mounted) return;
+    Navigator.pop(context);
+    widget.onSearch(query);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEmpty = _ctrl.text.isEmpty;
+    final showDefaults = isEmpty && _history.isEmpty;
+
+    return Padding(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 8),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD1D5DB),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // search field
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              textInputAction: TextInputAction.search,
+              onSubmitted: _submit,
+              decoration: const InputDecoration(
+                hintText: 'Должность, компания...',
+                hintStyle:
+                    TextStyle(color: Color(0xFF9E9E9E), fontSize: 15),
+                prefixIcon:
+                    Icon(Icons.search_rounded, color: _blue, size: 22),
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                  borderSide: BorderSide(color: _blue),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                  borderSide: BorderSide(color: _blue),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                  borderSide: BorderSide(color: _blue, width: 2),
+                ),
+                filled: true,
+                fillColor: Color(0xFFF0F4FF),
+              ),
+            ),
+          ),
+          // location row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(children: const [
+              Icon(Icons.location_on_rounded, color: _blue, size: 18),
+              SizedBox(width: 6),
+              Text(
+                'Ташкент',
+                style: TextStyle(
+                  color: _blue,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ]),
+          ),
+          const Divider(height: 1),
+          // history header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'История поиска',
+                style: const TextStyle(
+                  color: Color(0xFF9E9E9E),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          if (showDefaults) ...[
+            _tile('Все вакансии'),
+            _tile('Все регионы'),
+          ] else
+            for (final item in _suggestions) _tile(item),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _tile(String text) => ListTile(
+        dense: true,
+        leading: const Icon(Icons.history_rounded,
+            color: Color(0xFF9E9E9E), size: 20),
+        title: Text(text,
+            style: const TextStyle(
+                fontSize: 15, color: Color(0xFF3C3C43))),
+        onTap: () {
+          _ctrl.text = text;
+          _submit(text);
+        },
       );
 }
 
