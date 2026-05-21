@@ -279,70 +279,131 @@ export async function scoreResumeCtrl(req: AuthRequest, res: Response): Promise<
   });
 }
 
+function findCyrillicFont(): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'fonts', 'DejaVuSans.ttf'),
+    path.join(process.cwd(), 'fonts', 'Arial.ttf'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 // GET /api/resume/:id/pdf
 export async function generateResumePdf(req: AuthRequest, res: Response): Promise<void> {
   const { id } = req.params;
+  try {
+    const profile = await prisma.seekerProfile.findUnique({ where: { userId: req.user!.userId } });
+    if (!profile) { fail(res, 'Profile not found', 404); return; }
+    const resume = await prisma.resume.findFirst({ where: { id, seekerId: profile.id } });
+    if (!resume) { fail(res, 'Resume not found', 404); return; }
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { email: true } });
+    const content = (resume.content ?? {}) as Record<string, unknown>;
 
-  const profile = await prisma.seekerProfile.findUnique({
-    where: { userId: req.user!.userId },
-  });
-  if (!profile) { console.error('[pdf] error:', 'Profile not found'); fail(res, 'Profile not found', 404); return; }
+    let photoBuffer: Buffer | null = null;
+    if (resume.photoUrl) {
+      try {
+        const resp = await fetch(resume.photoUrl);
+        if (resp.ok) photoBuffer = Buffer.from(await resp.arrayBuffer());
+      } catch { /* skip */ }
+    }
 
-  const existing = await prisma.resume.findFirst({
-    where: { id, seekerId: profile.id },
-  });
-  if (!existing) { console.error('[pdf] error:', 'Resume not found'); fail(res, 'Resume not found', 404); return; }
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 0, size: 'A4', bufferPages: true });
+    const fontPath = findCyrillicFont();
+    if (fontPath) doc.registerFont('Cv', fontPath);
+    const setFont = () => { if (fontPath) doc.font('Cv'); return doc; };
 
-  console.log('[pdf] generating for resume:', id, 'user:', req.user?.userId);
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
 
-  const content = existing.content as Record<string, unknown>;
-  const fontPath = initFonts();
+    await new Promise<void>((resolve, reject) => {
+      doc.on('end', resolve);
+      doc.on('error', reject);
 
-  const doc = new PDFDocument({ margin: 50 });
+      const PAGE_W = 595.28, MARGIN = 44, CONTENT_W = PAGE_W - MARGIN * 2;
+      const PRIMARY = '#2563EB', DARK = '#0F172A', MID = '#334155';
+      const MUTED = '#64748B', DIVIDER = '#E2E8F0', SECTION_LABEL = '#94A3B8';
+      const PHOTO_SIZE = 88, HEADER_Y = 28;
+      const HAS_PHOTO = !!photoBuffer;
+      const TEXT_X = HAS_PHOTO ? MARGIN + PHOTO_SIZE + 18 : MARGIN;
+      const TEXT_W = HAS_PHOTO ? CONTENT_W - PHOTO_SIZE - 18 : CONTENT_W;
 
-  const chunks: Buffer[] = [];
-  doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-  const pdfDone = new Promise<Buffer>((resolve, reject) => {
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-  });
+      if (HAS_PHOTO && photoBuffer) {
+        const cx = MARGIN + PHOTO_SIZE / 2, cy = HEADER_Y + PHOTO_SIZE / 2;
+        doc.save().circle(cx, cy, PHOTO_SIZE / 2).clip();
+        doc.image(photoBuffer, MARGIN, HEADER_Y, { width: PHOTO_SIZE, height: PHOTO_SIZE });
+        doc.restore().circle(cx, cy, PHOTO_SIZE / 2).lineWidth(2.5).strokeColor(PRIMARY).stroke();
+      }
 
-  if (fontPath) {
-    doc.registerFont('DejaVu', fontPath);
-    doc.font('DejaVu');
+      let textY = HEADER_Y + 2;
+      const seekerName = `${profile!.firstName ?? ''} ${profile!.lastName ?? ''}`.trim();
+      if (seekerName) { setFont().fontSize(20).fillColor(DARK).text(seekerName, TEXT_X, textY, { width: TEXT_W, lineBreak: false }); textY += 27; }
+      setFont().fontSize(12).fillColor(PRIMARY).text(resume!.title, TEXT_X, textY, { width: TEXT_W, lineBreak: false }); textY += 19;
+
+      const phone = (content['phone'] as string) || profile!.phone || '';
+      const city = (content['city'] as string) || profile!.city || '';
+      const email = (content['email'] as string) || user?.email || '';
+      const contacts = [phone, city, email].filter(Boolean).join('   |   ');
+      if (contacts) { setFont().fontSize(9).fillColor(MUTED).text(contacts, TEXT_X, textY, { width: TEXT_W, lineBreak: false }); textY += 15; }
+
+      const headerEndY = Math.max(textY + 10, HEADER_Y + PHOTO_SIZE + 14);
+      doc.moveTo(MARGIN, headerEndY).lineTo(PAGE_W - MARGIN, headerEndY).lineWidth(0.75).strokeColor(DIVIDER).stroke();
+      let bodyY = headerEndY + 15;
+
+      const sectionTitle = (title: string) => {
+        setFont().fontSize(9).fillColor(SECTION_LABEL).text(title.toUpperCase(), MARGIN, bodyY, { width: CONTENT_W, lineBreak: false });
+        bodyY += 13;
+        doc.moveTo(MARGIN, bodyY - 2).lineTo(PAGE_W - MARGIN, bodyY - 2).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        bodyY += 6;
+      };
+      const sectionBody = (text: string) => {
+        setFont().fontSize(10).fillColor(MID).text(text, MARGIN, bodyY, { width: CONTENT_W, lineGap: 2 });
+        bodyY = doc.y + 10;
+      };
+      const sectionGap = () => {
+        doc.moveTo(MARGIN, bodyY).lineTo(PAGE_W - MARGIN, bodyY).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        bodyY += 13;
+      };
+
+      const summary = (content['summary'] as string) ?? '';
+      const experience = (content['experience'] as string) || resume!.experience || '';
+      const education = (content['education'] as string) ?? '';
+      const languages = (content['languages'] as string) ?? '';
+
+      if (summary) { sectionTitle('О себе'); sectionBody(summary); sectionGap(); }
+      if (experience) { sectionTitle('Опыт работы'); sectionBody(experience); sectionGap(); }
+      if (education) { sectionTitle('Образование'); sectionBody(education); sectionGap(); }
+
+      if (resume!.skills.length > 0) {
+        sectionTitle('Навыки');
+        const TAG_H = 20, PAD_H = 10, PAD_V = 4;
+        let tagX = MARGIN, tagY = bodyY;
+        setFont().fontSize(9);
+        for (const skill of resume!.skills) {
+          const tw = doc.widthOfString(skill) + PAD_H * 2;
+          if (tagX + tw > PAGE_W - MARGIN) { tagX = MARGIN; tagY += TAG_H + 6; }
+          doc.roundedRect(tagX, tagY, tw, TAG_H, 10).fill('#DBEAFE');
+          setFont().fontSize(9).fillColor('#1E40AF').text(skill, tagX + PAD_H, tagY + PAD_V, { width: tw - PAD_H * 2, lineBreak: false });
+          tagX += tw + 8;
+        }
+        bodyY = tagY + TAG_H + 13;
+        sectionGap();
+      }
+
+      if (languages) { sectionTitle('Языки'); sectionBody(languages); }
+
+      doc.end();
+    });
+
+    const pdfBuffer = Buffer.concat(chunks);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (e) {
+    if (!res.headersSent) fail(res, `PDF generation error: ${e instanceof Error ? e.message : 'unknown'}`);
   }
-
-  doc.fontSize(20).text(existing.title || 'Резюме', { align: 'center' });
-  doc.moveDown();
-
-  if (content.summary) {
-    doc.fontSize(12).text(String(content.summary));
-    doc.moveDown();
-  }
-
-  if (content.experience) {
-    doc.fontSize(14).text('Опыт работы');
-    doc.fontSize(11).text(String(content.experience));
-    doc.moveDown();
-  }
-
-  if (content.education) {
-    doc.fontSize(14).text('Образование');
-    doc.fontSize(11).text(String(content.education));
-    doc.moveDown();
-  }
-
-  if (Array.isArray(content.skills) && content.skills.length > 0) {
-    doc.fontSize(14).text('Навыки');
-    doc.fontSize(11).text((content.skills as string[]).join(', '));
-    doc.moveDown();
-  }
-
-  doc.end();
-  const pdfBuffer = await pdfDone;
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
-  res.send(pdfBuffer);
 }
 
 // DELETE /api/resume/:id
