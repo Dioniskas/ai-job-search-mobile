@@ -90,6 +90,26 @@ app.get('/health', (_req, res) => {
 httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   initFonts().catch(() => {});
+
+  const rawDomain =
+    process.env.RAILWAY_PUBLIC_DOMAIN ?? process.env.FRONTEND_URL;
+  const pingUrl = rawDomain
+    ? rawDomain.startsWith('http')
+      ? `${rawDomain}/health`
+      : `https://${rawDomain}/health`
+    : null;
+
+  if (pingUrl) {
+    setInterval(async () => {
+      try {
+        await fetch(pingUrl);
+        console.log('[keep-alive] ping ok');
+      } catch (e) {
+        console.error('[keep-alive] ping failed:', e);
+      }
+    }, 14 * 60 * 1000);
+    console.log(`[keep-alive] pinging ${pingUrl} every 14 min`);
+  }
 });
 
 export { httpServer };

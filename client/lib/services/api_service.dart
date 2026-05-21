@@ -19,7 +19,9 @@ class _CacheEntry {
 
 class ApiService {
   static const String baseUrl = 'https://ai-job-search-mobile-production.up.railway.app';
-  static const _timeout = Duration(seconds: 15);
+  static const _timeout = Duration(seconds: 30);
+  static const _maxRetries = 3;
+  static const _retryDelay = Duration(seconds: 2);
 
   // ── In-memory cache ────────────────────────────────────────────────────────
   static final Map<String, _CacheEntry> _cache = {};
@@ -47,91 +49,48 @@ class ApiService {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-  static Future<http.Response> _safeGet(Uri uri,
-      {Map<String, String>? headers}) async {
-    try {
-      return await http.get(uri, headers: headers).timeout(_timeout);
-    } on SocketException {
-      throw Exception('Нет подключения к интернету');
-    } on HttpException {
-      throw Exception('Сервер недоступен. Попробуйте позже.');
-    } catch (e) {
-      if (e.toString().contains('TimeoutException')) {
+  static Future<T> _withRetry<T>(Future<T> Function() fn) async {
+    for (int attempt = 1; attempt <= _maxRetries; attempt++) {
+      try {
+        return await fn();
+      } on SocketException {
+        if (attempt == _maxRetries) {
+          throw Exception('Нет подключения к интернету');
+        }
+      } on TimeoutException {
+        if (attempt == _maxRetries) {
+          throw Exception('Сервер недоступен. Попробуйте позже.');
+        }
+      } on HttpException {
         throw Exception('Сервер недоступен. Попробуйте позже.');
       }
-      rethrow;
+      await Future.delayed(_retryDelay);
     }
+    throw Exception('Сервер недоступен. Попробуйте позже.');
   }
+
+  static Future<http.Response> _safeGet(Uri uri,
+          {Map<String, String>? headers}) =>
+      _withRetry(() => http.get(uri, headers: headers).timeout(_timeout));
 
   static Future<http.Response> _safePost(Uri uri,
-      {Map<String, String>? headers, Object? body}) async {
-    try {
-      return await http
-          .post(uri, headers: headers, body: body)
-          .timeout(_timeout);
-    } on SocketException {
-      throw Exception('Нет подключения к интернету');
-    } on HttpException {
-      throw Exception('Сервер недоступен. Попробуйте позже.');
-    } catch (e) {
-      if (e.toString().contains('TimeoutException')) {
-        throw Exception('Сервер недоступен. Попробуйте позже.');
-      }
-      rethrow;
-    }
-  }
+          {Map<String, String>? headers, Object? body}) =>
+      _withRetry(
+          () => http.post(uri, headers: headers, body: body).timeout(_timeout));
 
   static Future<http.Response> _safePut(Uri uri,
-      {Map<String, String>? headers, Object? body}) async {
-    try {
-      return await http
-          .put(uri, headers: headers, body: body)
-          .timeout(_timeout);
-    } on SocketException {
-      throw Exception('Нет подключения к интернету');
-    } on HttpException {
-      throw Exception('Сервер недоступен. Попробуйте позже.');
-    } catch (e) {
-      if (e.toString().contains('TimeoutException')) {
-        throw Exception('Сервер недоступен. Попробуйте позже.');
-      }
-      rethrow;
-    }
-  }
+          {Map<String, String>? headers, Object? body}) =>
+      _withRetry(
+          () => http.put(uri, headers: headers, body: body).timeout(_timeout));
 
   static Future<http.Response> _safePatch(Uri uri,
-      {Map<String, String>? headers, Object? body}) async {
-    try {
-      return await http
-          .patch(uri, headers: headers, body: body)
-          .timeout(_timeout);
-    } on SocketException {
-      throw Exception('Нет подключения к интернету');
-    } on HttpException {
-      throw Exception('Сервер недоступен. Попробуйте позже.');
-    } catch (e) {
-      if (e.toString().contains('TimeoutException')) {
-        throw Exception('Сервер недоступен. Попробуйте позже.');
-      }
-      rethrow;
-    }
-  }
+          {Map<String, String>? headers, Object? body}) =>
+      _withRetry(() =>
+          http.patch(uri, headers: headers, body: body).timeout(_timeout));
 
   static Future<http.Response> _safeDelete(Uri uri,
-      {Map<String, String>? headers}) async {
-    try {
-      return await http.delete(uri, headers: headers).timeout(_timeout);
-    } on SocketException {
-      throw Exception('Нет подключения к интернету');
-    } on HttpException {
-      throw Exception('Сервер недоступен. Попробуйте позже.');
-    } catch (e) {
-      if (e.toString().contains('TimeoutException')) {
-        throw Exception('Сервер недоступен. Попробуйте позже.');
-      }
-      rethrow;
-    }
-  }
+          {Map<String, String>? headers}) =>
+      _withRetry(() => http.delete(uri, headers: headers).timeout(_timeout));
 
   static Map<String, dynamic> _parse(http.Response response) {
     if (response.statusCode == 401) throw const UnauthorizedException();
