@@ -18,7 +18,6 @@ import {
 
 // ── Font discovery for Cyrillic support ───────────────────────────────────────
 const DEJAVU_LOCAL = nodePath.join(process.cwd(), 'fonts', 'DejaVuSans.ttf');
-const DEJAVU_URL   = 'https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans.ttf';
 
 function findCyrillicFont(): string | undefined {
   const candidates = [
@@ -41,23 +40,10 @@ function findCyrillicFont(): string | undefined {
   return candidates.find(p => fs.existsSync(p));
 }
 
-export async function initFonts(): Promise<void> {
+export function initFonts(): void {
   if (fs.existsSync(DEJAVU_LOCAL)) return;
-  if (findCyrillicFont()) return; // system font found, no need to download
-
-  try {
-    const fontsDir = nodePath.join(process.cwd(), 'fonts');
-    if (!fs.existsSync(fontsDir)) fs.mkdirSync(fontsDir, { recursive: true });
-
-    console.log('[fonts] Downloading DejaVuSans.ttf...');
-    const resp = await fetch(DEJAVU_URL);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const buf = Buffer.from(await resp.arrayBuffer());
-    fs.writeFileSync(DEJAVU_LOCAL, buf);
-    console.log('[fonts] DejaVuSans.ttf saved to', DEJAVU_LOCAL);
-  } catch (e) {
-    console.warn('[fonts] Could not download DejaVuSans.ttf:', e instanceof Error ? e.message : e);
-  }
+  if (findCyrillicFont()) return;
+  console.error('[fonts] DejaVuSans.ttf not found at', DEJAVU_LOCAL, '— PDF will render without Cyrillic font');
 }
 
 async function getOrCreateProfile(userId: string) {

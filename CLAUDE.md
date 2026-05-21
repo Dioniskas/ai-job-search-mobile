@@ -91,15 +91,7 @@
 ### Мобильное приложение
 - APK: client/build/app/outputs/flutter-apk/app-release.apk
 - API URL: https://ai-job-search-mobile-production.up.railway.app
-- Для локальной разработки менять baseUrl в client/lib/services/api_service.dart
-
-### Локальная разработка (ТЕКУЩИЙ РЕЖИМ)
-- Сервер: `cd server && npm run dev` (порт 5000)
-- Flutter на телефоне: подключить USB + `cd client && flutter run`
-- Flutter Web: `cd client && flutter run -d chrome --web-browser-flag "--disable-web-security"`
-- API URL для локалки: http://192.168.x.x:5000 (узнать IP через ipconfig)
-- Менять baseUrl в client/lib/services/api_service.dart
-- Railway используется только для финального деплоя и APK сборки
+- baseUrl в client/lib/services/api_service.dart = Railway URL (production режим)
 
 ---
 
@@ -112,22 +104,25 @@ client/
 │   ├── screens/
 │   │   ├── auth/
 │   │   │   ├── login_screen.dart         # Google Sign In добавлен
-│   │   │   └── register_screen.dart
+│   │   │   ├── register_screen.dart
+│   │   │   └── role_select_screen.dart   # Выбор роли после Google OAuth
 │   │   ├── seeker/
-│   │   │   ├── home_screen.dart          # Приветствие по времени, статистика
-│   │   │   ├── profile_screen.dart       # Тёмная тема, статус поиска
-│   │   │   ├── resume_screen.dart        # Bottom sheet с 4 вариантами создания
-│   │   │   ├── resume_create_screen.dart # 4 способа создания резюме
-│   │   │   ├── resume_detail_screen.dart # Просмотр с фото
-│   │   │   ├── resume_edit_screen.dart   # Редактирование с фото
-│   │   │   ├── search_screen.dart        # Слайдер зарплаты, сортировка
+│   │   │   ├── seeker_shell.dart         # Bottom nav: Поиск/Карьера/Отклики/Сообщения/Профиль
+│   │   │   ├── home_screen.dart          # Вкладка "Карьера" — ИИ подбор, аналитика
+│   │   │   ├── search_screen.dart        # Вкладка "Поиск" — вакансии
+│   │   │   ├── profile_screen.dart       # Профиль + резюме + настройки
+│   │   │   ├── resume_screen.dart        # Список резюме
+│   │   │   ├── resume_create_screen.dart # 6-шаговая форма создания резюме
+│   │   │   ├── resume_detail_screen.dart # Просмотр с фото + кнопки
+│   │   │   ├── resume_edit_screen.dart   # Редактирование
 │   │   │   ├── vacancy_detail_screen.dart
-│   │   │   ├── applications_screen.dart
+│   │   │   ├── applications_screen.dart  # Отклики с фильтрами + отмена
 │   │   │   ├── ai_match_screen.dart
 │   │   │   ├── interview_prep_screen.dart
 │   │   │   ├── analytics_screen.dart
 │   │   │   └── chat_screen.dart
 │   │   ├── employer/
+│   │   │   ├── employer_shell.dart
 │   │   │   ├── employer_dashboard.dart
 │   │   │   ├── employer_profile_screen.dart
 │   │   │   ├── vacancy_list_screen.dart
@@ -141,7 +136,7 @@ client/
 │   │       └── notifications_screen.dart
 │   ├── services/api_service.dart
 │   ├── providers/
-│   │   ├── auth_provider.dart            # loginWithGoogle добавлен
+│   │   ├── auth_provider.dart            # loginWithGoogle + completeGoogleAuth
 │   │   └── theme_provider.dart
 │   ├── models/
 │   └── widgets/
@@ -166,7 +161,7 @@ client/
 - isVisible, searchStatus (ACTIVE | OPEN | NOT_LOOKING), boostedUntil
 
 ### resumes
-- id, seekerId, title, content (JSON), pdfUrl, photoUrl (добавлено)
+- id, seekerId, title, content (JSON), pdfUrl, photoUrl
 - isAiGenerated, isMain, skills (array), experience
 - createdAt, updatedAt
 
@@ -200,7 +195,8 @@ client/
 - GET /api/auth/me
 - POST /api/auth/forgot-password
 - POST /api/auth/reset-password
-- POST /api/auth/google/mobile (Google OAuth)
+- POST /api/auth/google/mobile (проверка токена, isNewUser flow)
+- POST /api/auth/google/complete (создание аккаунта с ролью)
 
 ### Соискатель
 - GET/PUT /api/seeker/profile
@@ -217,7 +213,7 @@ client/
 - GET /api/resume/:id/pdf
 - PUT /api/resume/:id
 - PUT /api/resume/:id/set-main
-- POST /api/resume/:id/photo (загрузка фото резюме)
+- POST /api/resume/:id/photo
 - DELETE /api/resume/:id
 
 ### Вакансии
@@ -228,6 +224,11 @@ client/
 - POST /api/vacancies
 - PUT /api/vacancies/:id
 - DELETE /api/vacancies/:id
+
+### Отклики
+- GET /api/applications
+- POST /api/applications
+- DELETE /api/applications/:id (только PENDING, только свой)
 
 ### ИИ-функции (везде "Ассистент" в UI)
 - POST /api/ai/match-vacancies
@@ -249,15 +250,17 @@ client/
 
 ---
 
-## Google OAuth конфигурация
+## Google OAuth конфигурация (АКТУАЛЬНО)
 
-- Firebase проект: ai-job-search-70a97
-- Google Cloud проект: ai-job-search-f4e2a (НЕ "My First Project"!)
-- Web Client ID: 685871848467-m1ef595poflafe15a836ibrj3hfejbjq.apps.googleusercontent.com
-- Android Client ID: 310538934424-ob4g36nbd2p1fl7gqdkumm45j1kbhuh9.apps.googleusercontent.com
+- Firebase проект: ai-job-search-a184d (НОВЫЙ!)
+- Google Cloud проект: ai-job-search-a184d
+- Web Client ID: [see Railway env GOOGLE_CLIENT_ID]
+- Android Client ID (debug): [see google-services.json]
+- Android Client ID (release): [see google-services.json]
 - SHA-1 debug: F8:5D:A4:47:83:15:B6:A8:DA:BB:D3:BE:C7:9E:D7:24:43:52:9B:67
-- SHA-1 получить: cd client/android && ./gradlew signingReport
-- Проблема: ApiException 10 — нужно пересоздать Android OAuth client в проекте ai-job-search-f4e2a
+- SHA-1 release: 4E:65:0E:28:4B:67:87:30:35:99:24:43:C9:6E:DC:9E:C9:3C:11:35
+- GOOGLE_CLIENT_ID (Railway): [set in Railway env vars]
+- ✅ Google OAuth работает на release APK
 
 ---
 
@@ -276,15 +279,15 @@ GROQ_API_KEY=...
 IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/dioniskas
 IMAGEKIT_PUBLIC_KEY=...
 IMAGEKIT_PRIVATE_KEY=...
-FIREBASE_PROJECT_ID=ai-job-search-70a97
+FIREBASE_PROJECT_ID=ai-job-search-a184d
 FIREBASE_CLIENT_EMAIL=...
 FIREBASE_PRIVATE_KEY=...
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=den7026960@gmail.com
 EMAIL_PASS=...
-GOOGLE_CLIENT_ID=[GOOGLE_CLIENT_ID]
-GOOGLE_CLIENT_SECRET=[GOOGLE_CLIENT_SECRET]
+GOOGLE_CLIENT_ID=[your-google-client-id]
+GOOGLE_CLIENT_SECRET=[your-google-client-secret]
 FRONTEND_URL=https://ai-job-search-mobile-production.up.railway.app
 CLIENT_URL=https://ai-job-search-mobile-production.up.railway.app
 PAYME_MERCHANT_ID=test
@@ -298,13 +301,15 @@ CLICK_TEST_MODE=true
 
 ---
 
-## Дизайн
+## Дизайн (стиль hh.ru + Material 3)
 
 - Основной цвет: синий (#2563EB)
 - Акцентный: зелёный (#16A34A)
 - Предупреждения: оранжевый (#F97316)
-- Фон светлый: cs.surface, тёмный: cs.surface (через ThemeProvider)
-- Material Design 3, Bottom navigation bar
+- Фон светлый: #F2F2F7, тёмный: #000000
+- Карточки светлые: белые, тёмные: #1C1C1E
+- Bottom nav светлый: белый, тёмный: #1C1C1E
+- Material Design 3, скругления 14-16px
 - Глобальная тёмная тема через ThemeProvider ✅
 - Все тексты на русском языке
 - "ИИ" заменён на "Ассистент" везде в UI
@@ -323,36 +328,31 @@ CLICK_TEST_MODE=true
 ### ✅ Блок 8 — Админ панель (ГОТОВО)
 ### ✅ Блок 9 — Политика и документы (ГОТОВО)
 
-### 🔄 Блок 10 — Деплой и релиз (В ПРОЦЕССЕ)
+### ✅ Блок 10 — Деплой и релиз (ГОТОВО)
 - ✅ Supabase БД настроена и мигрирована
 - ✅ Railway деплой работает, Node.js 20
 - ✅ APK собирается и работает на телефоне
-- ✅ CORS исправлен для Flutter Web и мобильного
+- ✅ CORS исправлен
 - ✅ ImageKit работает
-- ⚠️ Connection pool timeout на бесплатном Supabase — нужен retry или upgrade до Pro
-- ❌ Google OAuth не работает (ApiException: 10)
-- 🔄 Голосовой ввод — исправлено разрешение микрофона, нужна проверка
+- ✅ Google OAuth работает (release APK)
+- ✅ Голосовой ввод работает
+- ⚠️ Connection pool timeout — нужен retry или Supabase Pro
 
-### 🔄 Блок 11 — UX и дизайн (В ПРОЦЕССЕ)
-- ✅ Тёмная тема глобально (исправлено 17 файлов)
-- ✅ Новый UX резюме — bottom sheet с 4 вариантами
-- ✅ "Ассистент" вместо "ИИ" везде
-- ✅ Главный экран — приветствие, статистика
-- ✅ Поиск — слайдер зарплаты, сортировка
-- ✅ Редактирование резюме с фото
-- ❌ PDF резюме — нужен профессиональный дизайн с фото как hh.ru
+### 🔄 Блок 11 — Редизайн под hh.ru (В ПРОЦЕССЕ)
+- ✅ Material 3 тема обновлена
+- ✅ Bottom navigation переделан (5 вкладок как hh.ru)
+- ✅ Форма резюме — 6 шагов
+- ✅ Кнопки резюме переделаны
+- ✅ Фото резюме — загрузка работает
+- ✅ Отмена отклика работает
+- 🔄 Поиск — карточки вакансий как hh.ru
+- 🔄 Детальная вакансия — редизайн
+- 🔄 Отклики — фильтры по статусу
+- 🔄 Профиль — редизайн как hh.ru
+- ❌ PDF резюме — кириллица (шрифт скачивается при старте)
 
-### 📋 Блок 12 — Google OAuth (В РАЗРАБОТКЕ)
-- Серверная часть готова (google-auth.controller.ts)
-- Флаттер часть готова (login_screen.dart)
-- ❌ ApiException 10 — нужно пересоздать Android client в правильном проекте
-
-### 📋 Блок 13 — Голосовой ввод резюме
-- ✅ flutter_sound установлен
-- ✅ Роут POST /api/resume/generate/voice есть
-- ✅ permission_handler добавлен, запрос разрешения микрофона исправлен
-- ✅ RECORD_AUDIO добавлен в AndroidManifest.xml
-- 🔄 Требует тестирования на устройстве
+### 📋 Блок 12 — Google OAuth ✅ ГОТОВО
+### 📋 Блок 13 — Голосовой ввод ✅ ГОТОВО
 
 ### 📋 Блок 14 — Локализация (Узбекский язык)
 - flutter_localizations
@@ -364,13 +364,13 @@ CLICK_TEST_MODE=true
 
 ---
 
-## Текущие проблемы (приоритет)
+## Текущие задачи редизайна (приоритет)
 
-1. 🔄 Голосовой ввод — проверить после исправления разрешений
-2. ❌ Google OAuth ApiException 10 — пересоздать Android client в проекте ai-job-search-f4e2a
-3. ⚠️ Connection pool timeout — retry логика или Supabase Pro
-4. ❌ PDF резюме — профессиональный дизайн с фото
-5. ⚠️ Все ключи API в открытом чате — сменить перед релизом
+1. 🔄 search_screen.dart — карточки вакансий как hh.ru
+2. 🔄 vacancy_detail_screen.dart — полный редизайн
+3. 🔄 applications_screen.dart — фильтры по статусу
+4. 🔄 profile_screen.dart — редизайн как hh.ru + меню настроек
+5. ⚠️ PDF резюме — проверить кириллицу после деплоя
 
 ---
 
@@ -390,4 +390,5 @@ CLICK_TEST_MODE=true
 - Админ: den7026960@gmail.com / [PASSWORD]
 - GitHub: https://github.com/Dioniskas/ai-job-search-mobile
 - Railway root directory: server/
-- Keystore для APK сохранён — без него нельзя обновить в Google Play
+- Keystore: client/android/app/aijobsearch.keystore (пароль: aijobsearch123)
+- Без keystore нельзя обновить APK в Google Play
