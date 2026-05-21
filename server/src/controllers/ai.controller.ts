@@ -3,62 +3,60 @@ import { AuthRequest } from '../types';
 import { ok, fail } from '../utils/response';
 import prisma from '../lib/prisma';
 import {
-  matchPercent,
-  matchVacancies,
-  matchResumes,
-  generateCoverLetter,
-  estimateSalary,
-} from '../services/ai/match.service';
-import {
+  generateRejection,
   generateInterviewQuestions,
   evaluateInterviewAnswer,
+  calculateMatchPercent,
+  keywordScore,
+  generateCoverLetter,
+  estimateSalary,
 } from '../services/ai/groq.service';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+export async function generateRejectionReason(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { userId, role } = req.user!;
 
-type ResumeRow = Awaited<ReturnType<typeof prisma.resume.findUniqueOrThrow>>;
-type VacancyRow = Awaited<ReturnType<typeof prisma.vacancy.findUniqueOrThrow>>;
+    if (role !== 'EMPLOYER') { fail(res, 'Доступ запрещён', 403); return; }
 
-function resumeToText(r: ResumeRow): string {
-  const c = (typeof r.content === 'object' && r.content !== null && !Array.isArray(r.content))
-    ? r.content as Record<string, unknown>
-    : {};
-  return [
-    `Должность: ${r.title}`,
-    c['summary']    ? `О себе: ${c['summary']}`         : '',
-    c['experience'] ? `Опыт: ${c['experience']}`         : '',
-    c['education']  ? `Образование: ${c['education']}`   : '',
-    r.skills.length ? `Навыки: ${r.skills.join(', ')}`   : '',
-    c['languages']  ? `Языки: ${c['languages']}`         : '',
-    r.experience    ? `Стаж: ${r.experience}`             : '',
-    c['rawText']    ? `Текст резюме: ${c['rawText']}`    : '',
-  ].filter(Boolean).join('\n');
+    const { applicationId } = req.body as { applicationId: string };
+    if (!applicationId) { fail(res, 'applicationId обязателен'); return; }
+
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        employer: { select: { userId: true, companyName: true } },
+        seeker: { select: { firstName: true, lastName: true } },
+        vacancy: { select: { title: true } },
+      },
+    });
+
+    if (!application) { fail(res, 'Отклик не найден', 404); return; }
+    if (application.employer.userId !== userId) { fail(res, 'Доступ запрещён', 403); return; }
+
+    const text = await generateRejection({
+      companyName: application.employer.companyName,
+      seekerName: `${application.seeker.firstName} ${application.seeker.lastName}`,
+      vacancyTitle: application.vacancy.title,
+    });
+
+    ok(res, { text });
+  } catch (e) {
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
+  }
 }
 
-function vacancyToText(v: VacancyRow): string {
-  return [
-    `Должность: ${v.title}`,
-    `Описание: ${v.description}`,
-    v.employmentType ? `Тип занятости: ${v.employmentType}` : '',
-    v.experience     ? `Требуемый опыт: ${v.experience}`     : '',
-    v.city           ? `Город: ${v.city}`                    : '',
-  ].filter(Boolean).join('\n');
-}
+export async function interviewPrep(req: AuthRequest, res: Response): Promise<void> {
+  try {
+    const { vacancyTitle, vacancyDescription, vacancyId } = req.body as {
+      vacancyTitle?: string;
+      vacancyDescription?: string;
+      vacancyId?: string;
+    };
 
-// ── POST /api/ai/interview-prep ───────────────────────────────────────────────
+    let title = vacancyTitle?.trim() ?? '';
+    let description = vacancyDescription?.trim() ?? '';
 
-export async function aiInterviewPrep(req: AuthRequest, res: Response): Promise<void> {
-  const { vacancyTitle, vacancyDescription, vacancyId } = req.body as {
-    vacancyTitle?: string;
-    vacancyDescription?: string;
-    vacancyId?: string;
-  };
-
-  let title = vacancyTitle?.trim() ?? '';
-  let description = vacancyDescription?.trim() ?? '';
-
-  if (vacancyId && !title) {
-    try {
+    if (vacancyId && !title) {
       const vacancy = await prisma.vacancy.findUnique({
         where: { id: vacancyId },
         select: { title: true, description: true },
@@ -67,180 +65,267 @@ export async function aiInterviewPrep(req: AuthRequest, res: Response): Promise<
         title = vacancy.title;
         description = vacancy.description;
       }
-    } catch {
-      // fall through
     }
-  }
 
-  if (!title) { fail(res, 'vacancyTitle обязателен'); return; }
+    if (!title) { fail(res, 'vacancyTitle обязателен'); return; }
 
-  try {
     const questions = await generateInterviewQuestions({ vacancyTitle: title, vacancyDescription: description || undefined });
+
     ok(res, { questions, vacancyTitle: title });
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// ── POST /api/ai/interview-feedback ──────────────────────────────────────────
-
-export async function aiInterviewFeedback(req: AuthRequest, res: Response): Promise<void> {
-  const { question, answer, vacancyTitle } = req.body as {
-    question: string;
-    answer: string;
-    vacancyTitle: string;
-  };
-
-  if (!question || !answer || !vacancyTitle) {
-    fail(res, 'question, answer и vacancyTitle обязательны'); return;
-  }
-  if (answer.trim().length < 5) {
-    fail(res, 'Ответ слишком короткий'); return;
-  }
-
+export async function interviewFeedback(req: AuthRequest, res: Response): Promise<void> {
   try {
+    const { question, answer, vacancyTitle } = req.body as {
+      question: string;
+      answer: string;
+      vacancyTitle: string;
+    };
+
+    if (!question || !answer || !vacancyTitle) {
+      fail(res, 'question, answer и vacancyTitle обязательны'); return;
+    }
+    if (answer.trim().length < 5) {
+      fail(res, 'Ответ слишком короткий'); return;
+    }
+
     const result = await evaluateInterviewAnswer({ question, answer, vacancyTitle });
+
     ok(res, result);
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// ── POST /api/ai/match-percent ────────────────────────────────────────────────
+// ── Match percent ──────────────────────────────────────────────────────────────
 
-export async function aiMatchPercent(req: AuthRequest, res: Response): Promise<void> {
-  const { resumeId, vacancyId } = req.body as { resumeId?: string; vacancyId?: string };
-  if (!resumeId || !vacancyId) { fail(res, 'resumeId и vacancyId обязательны'); return; }
-
+export async function matchPercent(req: AuthRequest, res: Response): Promise<void> {
   try {
+    const { resumeId, vacancyId } = req.body as { resumeId: string; vacancyId: string };
+
+    if (!resumeId || !vacancyId) {
+      fail(res, 'resumeId и vacancyId обязательны'); return;
+    }
+
+    const seeker = await prisma.seekerProfile.findUnique({
+      where: { userId: req.user!.userId },
+    });
+    if (!seeker) { fail(res, 'Профиль соискателя не найден', 404); return; }
+
     const [resume, vacancy] = await Promise.all([
-      prisma.resume.findUnique({ where: { id: resumeId } }),
+      prisma.resume.findFirst({
+        where: { id: resumeId, seekerId: seeker.id },
+      }),
       prisma.vacancy.findUnique({ where: { id: vacancyId } }),
     ]);
-    if (!resume)  { fail(res, 'Резюме не найдено'); return; }
-    if (!vacancy) { fail(res, 'Вакансия не найдена'); return; }
 
-    const result = await matchPercent(resumeToText(resume), vacancyToText(vacancy));
-    ok(res, result);
+    if (!resume) { fail(res, 'Резюме не найдено', 404); return; }
+    if (!vacancy) { fail(res, 'Вакансия не найдена', 404); return; }
+
+    const content = resume.content as Record<string, unknown>;
+
+    const result = await calculateMatchPercent({
+      resumeTitle: resume.title,
+      resumeSkills: resume.skills,
+      resumeExperience: resume.experience ?? '',
+      vacancyTitle: vacancy.title,
+      vacancyDescription: vacancy.description,
+    });
+
+    // Update matchPercent in application if exists
+    await prisma.application.updateMany({
+      where: { resumeId, vacancyId, seekerId: seeker.id },
+      data: { matchPercent: result.percent },
+    }).catch(() => null);
+
+    ok(res, { percent: result.percent, explanation: result.explanation });
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// ── POST /api/ai/match-vacancies ──────────────────────────────────────────────
+// ── Match vacancies for a resume ───────────────────────────────────────────────
 
-export async function aiMatchVacancies(req: AuthRequest, res: Response): Promise<void> {
-  const { resumeId } = req.body as { resumeId?: string };
-  if (!resumeId) { fail(res, 'resumeId обязателен'); return; }
-
+export async function matchVacancies(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const resume = await prisma.resume.findUnique({ where: { id: resumeId } });
-    if (!resume) { fail(res, 'Резюме не найдено'); return; }
+    const { resumeId } = req.body as { resumeId: string };
+    if (!resumeId) { fail(res, 'resumeId обязателен'); return; }
+
+    const seeker = await prisma.seekerProfile.findUnique({
+      where: { userId: req.user!.userId },
+    });
+    if (!seeker) { fail(res, 'Профиль не найден', 404); return; }
+
+    const resume = await prisma.resume.findFirst({
+      where: { id: resumeId, seekerId: seeker.id },
+    });
+    if (!resume) { fail(res, 'Резюме не найдено', 404); return; }
 
     const vacancies = await prisma.vacancy.findMany({
       where: { isActive: true },
-      include: { employer: { select: { companyName: true, logoUrl: true, city: true } } },
+      include: {
+        employer: { select: { companyName: true, logoUrl: true } },
+      },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 50,
     });
 
-    const matches = await matchVacancies(
-      resumeToText(resume),
-      vacancies.map(v => ({
-        id:             v.id,
-        title:          v.title,
-        description:    v.description,
-        employmentType: v.employmentType,
-        experience:     v.experience,
-      })),
-    );
+    const resumeText = [resume.title, ...resume.skills, resume.experience ?? ''].join(' ');
 
-    const vacancyMap = new Map(vacancies.map(v => [v.id, v]));
-    const enriched = matches
-      .map(m => ({ ...m, vacancy: vacancyMap.get(m.vacancyId) ?? null }))
-      .filter(m => m.vacancy !== null);
+    const scored = vacancies
+      .map((v) => {
+        const vacancyText = `${v.title} ${v.description}`;
+        const percent = keywordScore(resumeText, vacancyText);
+        return {
+          percent,
+          reason: percent >= 60
+            ? 'Хорошее совпадение по навыкам и опыту'
+            : percent >= 35
+            ? 'Частичное совпадение'
+            : 'Низкое совпадение',
+          vacancy: v,
+        };
+      })
+      .filter((m) => m.percent >= 15)
+      .sort((a, b) => b.percent - a.percent)
+      .slice(0, 15);
 
-    ok(res, { matches: enriched });
+    ok(res, { matches: scored });
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// ── POST /api/ai/match-resumes ────────────────────────────────────────────────
+// ── Match resumes for a vacancy ────────────────────────────────────────────────
 
-export async function aiMatchResumes(req: AuthRequest, res: Response): Promise<void> {
-  const { vacancyId } = req.body as { vacancyId?: string };
-  if (!vacancyId) { fail(res, 'vacancyId обязателен'); return; }
-
+export async function matchResumes(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const vacancy = await prisma.vacancy.findUnique({ where: { id: vacancyId } });
-    if (!vacancy) { fail(res, 'Вакансия не найдена'); return; }
+    const { vacancyId } = req.body as { vacancyId: string };
+    if (!vacancyId) { fail(res, 'vacancyId обязателен'); return; }
+
+    const employer = await prisma.employer.findUnique({
+      where: { userId: req.user!.userId },
+    });
+    if (!employer) { fail(res, 'Профиль не найден', 404); return; }
+
+    const vacancy = await prisma.vacancy.findFirst({
+      where: { id: vacancyId, employerId: employer.id },
+    });
+    if (!vacancy) { fail(res, 'Вакансия не найдена', 404); return; }
 
     const resumes = await prisma.resume.findMany({
       include: {
         seeker: {
-          select: { firstName: true, lastName: true, city: true, photoUrl: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            photoUrl: true,
+            city: true,
+            isVisible: true,
+          },
         },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 20,
+      take: 100,
     });
 
-    const matches = await matchResumes(
-      vacancyToText(vacancy),
-      resumes.map(r => ({
-        id:         r.id,
-        title:      r.title,
-        skills:     r.skills,
-        experience: r.experience,
-      })),
-    );
+    const vacancyText = `${vacancy.title} ${vacancy.description}`;
 
-    const resumeMap = new Map(resumes.map(r => [r.id, r]));
-    const enriched = matches
-      .map(m => ({ ...m, resume: resumeMap.get(m.resumeId) ?? null }))
-      .filter(m => m.resume !== null);
+    const scored = resumes
+      .filter((r) => r.seeker.isVisible)
+      .map((r) => {
+        const resumeText = [r.title, ...r.skills, r.experience ?? ''].join(' ');
+        const percent = keywordScore(resumeText, vacancyText);
+        return {
+          percent,
+          reason: percent >= 60
+            ? 'Хорошее совпадение по навыкам'
+            : percent >= 35
+            ? 'Частичное совпадение'
+            : 'Низкое совпадение',
+          resume: r,
+        };
+      })
+      .filter((m) => m.percent >= 10)
+      .sort((a, b) => b.percent - a.percent)
+      .slice(0, 15);
 
-    ok(res, { matches: enriched });
+    ok(res, { matches: scored });
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// ── POST /api/ai/cover-letter ─────────────────────────────────────────────────
+// ── Cover letter ───────────────────────────────────────────────────────────────
 
-export async function aiCoverLetter(req: AuthRequest, res: Response): Promise<void> {
-  const { resumeId, vacancyId } = req.body as { resumeId?: string; vacancyId?: string };
-  if (!resumeId || !vacancyId) { fail(res, 'resumeId и vacancyId обязательны'); return; }
-
+export async function coverLetter(req: AuthRequest, res: Response): Promise<void> {
   try {
+    const { resumeId, vacancyId } = req.body as { resumeId: string; vacancyId: string };
+    if (!resumeId || !vacancyId) {
+      fail(res, 'resumeId и vacancyId обязательны'); return;
+    }
+
+    const seeker = await prisma.seekerProfile.findUnique({
+      where: { userId: req.user!.userId },
+    });
+    if (!seeker) { fail(res, 'Профиль не найден', 404); return; }
+
     const [resume, vacancy] = await Promise.all([
-      prisma.resume.findUnique({ where: { id: resumeId } }),
-      prisma.vacancy.findUnique({ where: { id: vacancyId } }),
+      prisma.resume.findFirst({ where: { id: resumeId, seekerId: seeker.id } }),
+      prisma.vacancy.findUnique({
+        where: { id: vacancyId },
+        include: { employer: { select: { companyName: true } } },
+      }),
     ]);
-    if (!resume)  { fail(res, 'Резюме не найдено'); return; }
-    if (!vacancy) { fail(res, 'Вакансия не найдена'); return; }
 
-    const coverLetter = await generateCoverLetter(resumeToText(resume), vacancyToText(vacancy));
-    ok(res, { coverLetter });
+    if (!resume) { fail(res, 'Резюме не найдено', 404); return; }
+    if (!vacancy) { fail(res, 'Вакансия не найдена', 404); return; }
+
+    const content = resume.content as Record<string, unknown>;
+
+    const letter = await generateCoverLetter({
+      seekerName: `${seeker.firstName} ${seeker.lastName}`,
+      resumeTitle: resume.title,
+      resumeSkills: resume.skills,
+      resumeSummary: (content['summary'] as string) ?? '',
+      vacancyTitle: vacancy.title,
+      companyName: vacancy.employer.companyName,
+    });
+
+    ok(res, { coverLetter: letter });
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// ── POST /api/ai/salary-estimate ──────────────────────────────────────────────
+// ── Salary estimate ────────────────────────────────────────────────────────────
 
-export async function aiSalaryEstimate(req: AuthRequest, res: Response): Promise<void> {
-  const { resumeId } = req.body as { resumeId?: string };
-  if (!resumeId) { fail(res, 'resumeId обязателен'); return; }
-
+export async function salaryEstimate(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const resume = await prisma.resume.findUnique({ where: { id: resumeId } });
-    if (!resume) { fail(res, 'Резюме не найдено'); return; }
+    const { resumeId } = req.body as { resumeId: string };
+    if (!resumeId) { fail(res, 'resumeId обязателен'); return; }
 
-    const estimate = await estimateSalary(resumeToText(resume));
+    const seeker = await prisma.seekerProfile.findUnique({
+      where: { userId: req.user!.userId },
+    });
+    if (!seeker) { fail(res, 'Профиль не найден', 404); return; }
+
+    const resume = await prisma.resume.findFirst({
+      where: { id: resumeId, seekerId: seeker.id },
+    });
+    if (!resume) { fail(res, 'Резюме не найдено', 404); return; }
+
+    const estimate = await estimateSalary({
+      title: resume.title,
+      skills: resume.skills,
+      experience: resume.experience ?? '',
+    });
+
     ok(res, estimate);
   } catch (e) {
-    fail(res, `Ошибка ИИ: ${e instanceof Error ? e.message : 'неизвестная ошибка'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }

@@ -1,34 +1,34 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.middleware';
-import { validate } from '../middleware/validate.middleware';
-import { createVacancySchema } from '../validation/schemas';
 import {
   listVacancies,
   getMapVacancies,
   getEmployerVacancies,
-  aiGenerateDescription,
   getVacancy,
   createVacancy,
   updateVacancy,
   deleteVacancy,
+  aiVacancyDescription,
   applyToVacancy,
 } from '../controllers/vacancy.controller';
 
 const router = Router();
 
-// Static paths MUST come before /:id
-router.get('/map',           authenticate, getMapVacancies);
-router.get('/employer/mine', authenticate, requireRole('EMPLOYER'), getEmployerVacancies);
-router.post('/ai-description', authenticate, requireRole('EMPLOYER'), aiGenerateDescription);
+router.use(authenticate);
 
-// Collection
-router.get('/',  authenticate, listVacancies);
-router.post('/', authenticate, requireRole('EMPLOYER'), validate(createVacancySchema), createVacancy);
+// Seeker + Employer: read
+router.get('/',               listVacancies);
+router.get('/map',            getMapVacancies);
+router.get('/employer/mine',  requireRole('EMPLOYER'), getEmployerVacancies);
+router.get('/:id',            getVacancy);
 
-// Item
-router.get('/:id',         authenticate, getVacancy);
-router.patch('/:id',       authenticate, requireRole('EMPLOYER'), updateVacancy);
-router.delete('/:id',      authenticate, requireRole('EMPLOYER'), deleteVacancy);
-router.post('/:id/apply',  authenticate, requireRole('SEEKER'), applyToVacancy);
+// Employer only: manage
+router.post('/',                      requireRole('EMPLOYER'), createVacancy);
+router.post('/ai-description',        requireRole('EMPLOYER'), aiVacancyDescription);
+router.patch('/:id',                  requireRole('EMPLOYER'), updateVacancy);
+router.delete('/:id',                 requireRole('EMPLOYER'), deleteVacancy);
+
+// Seeker only: apply
+router.post('/:id/apply',             requireRole('SEEKER'), applyToVacancy);
 
 export default router;

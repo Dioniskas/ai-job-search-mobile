@@ -286,12 +286,14 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
   const profile = await prisma.seekerProfile.findUnique({
     where: { userId: req.user!.userId },
   });
-  if (!profile) { fail(res, 'Profile not found', 404); return; }
+  if (!profile) { console.error('[pdf] error:', 'Profile not found'); fail(res, 'Profile not found', 404); return; }
 
   const existing = await prisma.resume.findFirst({
     where: { id, seekerId: profile.id },
   });
-  if (!existing) { fail(res, 'Resume not found', 404); return; }
+  if (!existing) { console.error('[pdf] error:', 'Resume not found'); fail(res, 'Resume not found', 404); return; }
+
+  console.log('[pdf] generating for resume:', id, 'user:', req.user?.userId);
 
   const content = existing.content as Record<string, unknown>;
   const fontPath = initFonts();

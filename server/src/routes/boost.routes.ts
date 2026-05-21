@@ -6,8 +6,8 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/status',  getBoostStatus);
-router.post('/resume',  requireRole('SEEKER'),   boostResume);
-router.post('/vacancy', requireRole('EMPLOYER'),  boostVacancy);
+router.get('/status', getBoostStatus);
+router.post('/resume', requireRole('SEEKER'), boostResume);
+router.post('/vacancy', requireRole('EMPLOYER'), boostVacancy);
 
 export default router;

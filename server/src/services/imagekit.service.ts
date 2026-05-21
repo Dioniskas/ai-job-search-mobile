@@ -1,9 +1,7 @@
-import ImageKit from 'imagekit';
+import { ImageKit, toFile } from '@imagekit/nodejs';
 
 const ik = new ImageKit({
-  publicKey:  process.env.IMAGEKIT_PUBLIC_KEY  as string,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY as string,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT as string,
 });
 
 export async function uploadBuffer(
@@ -12,8 +10,9 @@ export async function uploadBuffer(
   folder: string,
   fileName: string
 ): Promise<string> {
-  const result = await ik.upload({
-    file: buffer,
+  const file = await toFile(buffer, fileName, { type: mimetype });
+  const result = await ik.files.upload({
+    file,
     fileName,
     folder,
     useUniqueFileName: false,
@@ -23,6 +22,8 @@ export async function uploadBuffer(
   return result.url;
 }
 
+// Requires fileId — store it in the future if soft-delete is needed.
+// Currently unused; left for future sprints.
 export async function deleteFile(fileId: string): Promise<void> {
-  await ik.deleteFile(fileId);
+  await ik.files.delete(fileId);
 }

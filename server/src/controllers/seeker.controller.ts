@@ -16,37 +16,36 @@ export async function getProfile(req: AuthRequest, res: Response): Promise<void>
 }
 
 export async function upsertProfile(req: AuthRequest, res: Response): Promise<void> {
-  const { firstName, lastName, middleName, age, phone, city, about, searchStatus } = req.body as {
-    firstName?: string;
-    lastName?: string;
+  const { firstName, lastName, middleName, age, phone, city, about } = req.body as {
+    firstName: string;
+    lastName: string;
     middleName?: string;
     age?: string;
     phone?: string;
     city?: string;
     about?: string;
-    searchStatus?: string;
   };
 
-  const allowedStatuses = ['ACTIVE', 'OPEN', 'NOT_LOOKING'];
-
-  // Partial update: only include fields that were actually sent
-  const updateData: Record<string, unknown> = {};
-  if (firstName !== undefined) updateData['firstName'] = firstName;
-  if (lastName  !== undefined) updateData['lastName']  = lastName;
-  if (middleName !== undefined) updateData['middleName'] = middleName ?? null;
-  if (age       !== undefined) updateData['age']       = age ? parseInt(age, 10) : null;
-  if (phone     !== undefined) updateData['phone']     = phone ?? null;
-  if (city      !== undefined) updateData['city']      = city ?? null;
-  if (about     !== undefined) updateData['about']     = about ?? null;
-  if (searchStatus && allowedStatuses.includes(searchStatus)) {
-    updateData['searchStatus'] = searchStatus;
+  if (!firstName || !lastName) {
+    fail(res, 'firstName and lastName are required');
+    return;
   }
+
+  const data = {
+    firstName,
+    lastName,
+    middleName: middleName ?? null,
+    age: age ? parseInt(age, 10) : null,
+    phone: phone ?? null,
+    city: city ?? null,
+    about: about ?? null,
+  };
 
   try {
     const profile = await prisma.seekerProfile.upsert({
       where: { userId: req.user!.userId },
-      create: { userId: req.user!.userId, firstName: firstName ?? '', lastName: lastName ?? '', ...updateData },
-      update: updateData,
+      create: { userId: req.user!.userId, ...data },
+      update: data,
     });
     ok(res, { profile });
   } catch (e) {
@@ -62,7 +61,7 @@ export async function uploadPhoto(req: AuthRequest, res: Response): Promise<void
       req.file.buffer,
       req.file.mimetype,
       'ai-job-search/avatars',
-      `seeker-${req.user!.userId}-${Date.now()}`
+      `seeker-${req.user!.userId}`
     );
 
     const profile = await prisma.seekerProfile.upsert({

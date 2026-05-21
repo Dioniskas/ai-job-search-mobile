@@ -42,6 +42,7 @@ export async function getSkillTestQuestions(req: AuthRequest, res: Response): Pr
     const testData = getTestBySkill(skill);
     if (!testData) { fail(res, 'Тест не найден', 404); return; }
 
+    // Return questions without correctIndex (security)
     const questions = testData.questions.map(({ text, options }) => ({ text, options }));
 
     ok(res, {

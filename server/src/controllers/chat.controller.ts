@@ -1,168 +1,173 @@
 import { Response } from 'express';
 import { AuthRequest } from '../types';
 import { ok, fail } from '../utils/response';
-import { sendPush } from '../services/fcm.service';
 import prisma from '../lib/prisma';
+import { getIo } from '../lib/io';
 
-// GET /api/chat/conversations
 export async function getConversations(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const userId = req.user!.userId;
+    const { userId, role } = req.user!;
 
-    // Find all applications where this user is seeker or employer
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        seekerProfile: { select: { id: true, applications: { select: { id: true } } } },
-        employerProfile: { select: { id: true, applications: { select: { id: true } } } },
-      },
-    });
-    if (!user) { fail(res, 'User not found'); return; }
+    if (role === 'SEEKER') {
+      const seeker = await prisma.seekerProfile.findUnique({ where: { userId } });
+      if (!seeker) { fail(res, 'Профиль соискателя не найден', 404); return; }
 
-    const appIds = user.role === 'SEEKER'
-      ? (user.seekerProfile?.applications ?? []).map(a => a.id)
-      : (user.employerProfile?.applications ?? []).map(a => a.id);
+      const applications = await prisma.application.findMany({
+        where: { seekerId: seeker.id },
+        include: {
+          vacancy: { select: { title: true } },
+          employer: { select: { companyName: true, logoUrl: true } },
+          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
-    if (appIds.length === 0) { ok(res, { conversations: [] }); return; }
-
-    // Get last message per application
-    const conversations = await Promise.all(
-      appIds.map(async (applicationId) => {
-        const [lastMessage, unreadCount, application] = await Promise.all([
-          prisma.message.findFirst({
-            where: { applicationId },
-            orderBy: { createdAt: 'desc' },
-          }),
-          prisma.message.count({
-            where: { applicationId, receiverId: userId, isRead: false },
-          }),
-          prisma.application.findUnique({
-            where: { id: applicationId },
-            include: {
-              vacancy: { select: { id: true, title: true } },
-              resume: {
-                include: {
-                  seeker: { select: { firstName: true, lastName: true, photoUrl: true } },
-                },
-              },
-              employer: { select: { companyName: true, logoUrl: true } },
-            },
-          }),
-        ]);
-
-        if (!application || !lastMessage) return null;
-        return { applicationId, application, lastMessage, unreadCount };
-      }),
-    );
-
-    const result = conversations
-      .filter(Boolean)
-      .sort((a, b) =>
-        new Date(b!.lastMessage.createdAt).getTime() - new Date(a!.lastMessage.createdAt).getTime(),
+      const conversations = await Promise.all(
+        applications.map(async (app) => {
+          const unreadCount = await prisma.message.count({
+            where: { applicationId: app.id, receiverId: userId, isRead: false },
+          });
+          return {
+            applicationId: app.id,
+            partyName: app.employer.companyName,
+            partyAvatar: app.employer.logoUrl,
+            vacancyTitle: app.vacancy.title,
+            lastMessage: app.messages[0] ?? null,
+            unreadCount,
+            status: app.status,
+          };
+        })
       );
 
-    ok(res, { conversations: result });
+      ok(res, { conversations });
+    } else {
+      const employer = await prisma.employer.findUnique({ where: { userId } });
+      if (!employer) { fail(res, 'Профиль работодателя не найден', 404); return; }
+
+      const applications = await prisma.application.findMany({
+        where: { employerId: employer.id },
+        include: {
+          seeker: { select: { firstName: true, lastName: true, photoUrl: true } },
+          vacancy: { select: { title: true } },
+          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const conversations = await Promise.all(
+        applications.map(async (app) => {
+          const unreadCount = await prisma.message.count({
+            where: { applicationId: app.id, receiverId: userId, isRead: false },
+          });
+          return {
+            applicationId: app.id,
+            partyName: `${app.seeker.firstName} ${app.seeker.lastName}`,
+            partyAvatar: app.seeker.photoUrl,
+            vacancyTitle: app.vacancy.title,
+            lastMessage: app.messages[0] ?? null,
+            unreadCount,
+            status: app.status,
+          };
+        })
+      );
+
+      ok(res, { conversations });
+    }
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// GET /api/chat/:applicationId/messages
 export async function getMessages(req: AuthRequest, res: Response): Promise<void> {
-  const { applicationId } = req.params;
-  const userId = req.user!.userId;
-
   try {
-    const application = await prisma.application.findUnique({ where: { id: applicationId } });
-    if (!application) { fail(res, 'Application not found'); return; }
+    const { userId } = req.user!;
+    const { applicationId } = req.params;
 
-    // Verify access: user must be seeker or employer on this application
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
       include: {
-        seekerProfile: { select: { id: true } },
-        employerProfile: { select: { id: true } },
+        seeker: { select: { userId: true } },
+        employer: { select: { userId: true } },
       },
     });
-    const hasAccess =
-      (user?.seekerProfile?.id && user.seekerProfile.id === application.seekerId) ||
-      (user?.employerProfile?.id && user.employerProfile.id === application.employerId);
-    if (!hasAccess) { fail(res, 'Access denied', 403); return; }
 
-    const messages = await prisma.message.findMany({
-      where: { applicationId },
-      orderBy: { createdAt: 'asc' },
-    });
+    if (!application) { fail(res, 'Отклик не найден', 404); return; }
 
-    // Mark received messages as read
+    const isParticipant =
+      application.seeker.userId === userId || application.employer.userId === userId;
+    if (!isParticipant) { fail(res, 'Доступ запрещён', 403); return; }
+
     await prisma.message.updateMany({
       where: { applicationId, receiverId: userId, isRead: false },
       data: { isRead: true },
     });
 
+    const messages = await prisma.message.findMany({
+      where: { applicationId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        senderId: true,
+        receiverId: true,
+        applicationId: true,
+        text: true,
+        isRead: true,
+        createdAt: true,
+      },
+    });
+
     ok(res, { messages });
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
-// POST /api/chat/:applicationId/messages
 export async function sendMessage(req: AuthRequest, res: Response): Promise<void> {
-  const { applicationId } = req.params;
-  const { text } = req.body as { text?: string };
-  const senderId = req.user!.userId;
-
-  if (!text?.trim()) { fail(res, 'text is required'); return; }
-
   try {
+    const { userId } = req.user!;
+    const { applicationId } = req.params;
+    const { text } = req.body as { text: string };
+
+    if (!text?.trim()) { fail(res, 'Текст сообщения обязателен'); return; }
+
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
       include: {
-        vacancy: { select: { title: true } },
-        resume: { include: { seeker: { include: { user: { select: { id: true, fcmToken: true } } } } } },
-        employer: { include: { user: { select: { id: true, fcmToken: true } } } },
+        seeker: { select: { userId: true } },
+        employer: { select: { userId: true } },
       },
     });
-    if (!application) { fail(res, 'Application not found'); return; }
 
-    // Determine sender/receiver
-    const seekerUserId   = application.resume.seeker.user.id;
-    const employerUserId = application.employer.user.id;
+    if (!application) { fail(res, 'Отклик не найден', 404); return; }
 
-    let receiverId: string;
-    let receiverFcmToken: string | null;
-    let senderName: string;
+    const isSeeker = application.seeker.userId === userId;
+    const isEmployer = application.employer.userId === userId;
 
-    if (senderId === seekerUserId) {
-      receiverId = employerUserId;
-      receiverFcmToken = application.employer.user.fcmToken;
-      const s = application.resume.seeker;
-      senderName = `${s.firstName} ${s.lastName}`.trim();
-    } else if (senderId === employerUserId) {
-      receiverId = seekerUserId;
-      receiverFcmToken = application.resume.seeker.user.fcmToken;
-      senderName = application.employer.companyName;
-    } else {
-      fail(res, 'Access denied', 403);
-      return;
-    }
+    if (!isSeeker && !isEmployer) { fail(res, 'Доступ запрещён', 403); return; }
+
+    const receiverId = isSeeker ? application.employer.userId : application.seeker.userId;
 
     const message = await prisma.message.create({
-      data: { senderId, receiverId, applicationId, text: text.trim() },
+      data: { senderId: userId, receiverId, applicationId, text: text.trim() },
+      select: {
+        id: true,
+        senderId: true,
+        receiverId: true,
+        applicationId: true,
+        text: true,
+        isRead: true,
+        createdAt: true,
+      },
     });
 
-    // Push to receiver
-    if (receiverFcmToken) {
-      await sendPush(
-        receiverFcmToken,
-        `Сообщение от ${senderName}`,
-        text.trim().length > 80 ? text.trim().slice(0, 77) + '...' : text.trim(),
-        { type: 'NEW_MESSAGE', applicationId },
-      );
+    try {
+      getIo().to(`app_${applicationId}`).emit('new_message', message);
+    } catch {
+      // Socket not yet initialized or no active room; REST response is sufficient
     }
 
-    ok(res, { message });
+    ok(res, { message }, 201);
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }

@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -13,7 +12,6 @@ datasource db {
 enum Role {
   SEEKER
   EMPLOYER
-  ADMIN
 }
 
 enum ApplicationStatus {
@@ -23,23 +21,6 @@ enum ApplicationStatus {
   REJECTED
 }
 
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  CANCELLED
-}
-
-enum PaymentProvider {
-  PAYME
-  CLICK
-}
-
-enum BoostType {
-  RESUME_BOOST
-  VACANCY_BOOST
-}
-
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 model User {
@@ -47,21 +28,13 @@ model User {
   email     String   @unique
   password  String
   role      Role
-  fcmToken  String?
-  isBlocked Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  emailNotifications   Json?
-  passwordResetToken   String?
-  passwordResetExpires DateTime?
 
   seekerProfile       SeekerProfile?
   employerProfile     Employer?
   sentMessages        Message[]      @relation("SentMessages")
   receivedMessages    Message[]      @relation("ReceivedMessages")
   notifications       Notification[]
-  reportsMade         Report[]       @relation("ReportsMade")
-  payments            Payment[]
 
   @@map("users")
 }
@@ -79,8 +52,7 @@ model SeekerProfile {
   city        String?
   photoUrl    String?
   about       String?
-  isVisible    Boolean   @default(true)
-  searchStatus String    @default("ACTIVE")
+  isVisible   Boolean   @default(true)
   boostedUntil DateTime?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -99,9 +71,7 @@ model Resume {
   title        String
   content      Json
   pdfUrl       String?
-  photoUrl     String?
   isAiGenerated Boolean @default(false)
-  isMain       Boolean  @default(false)
   skills       String[]
   experience   String?
   createdAt    DateTime @default(now())
@@ -135,7 +105,6 @@ model Employer {
   website     String?
   logoUrl     String?
   city        String?
-  isVerified  Boolean @default(false)
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   vacancies    Vacancy[]
@@ -159,7 +128,6 @@ model Vacancy {
   employmentType String?
   experience     String?
   isActive       Boolean   @default(true)
-  isModerated    Boolean   @default(false)
   boostedUntil   DateTime?
   viewCount      Int       @default(0)
   createdAt      DateTime  @default(now())
@@ -241,57 +209,6 @@ model SavedVacancy {
 
   @@unique([seekerId, vacancyId])
   @@map("saved_vacancies")
-}
-
-// ─── Refresh tokens ───────────────────────────────────────────────────────────
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@map("refresh_tokens")
-}
-
-// ─── Reports ─────────────────────────────────────────────────────────────────
-
-model Report {
-  id         String    @id @default(cuid())
-  reporterId String
-  targetId   String
-  targetType String
-  reason     String
-  isResolved Boolean   @default(false)
-  resolvedAt DateTime?
-  createdAt  DateTime  @default(now())
-
-  reporter   User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
-
-  @@map("reports")
-}
-
-// ─── Vacancy subscriptions ────────────────────────────────────────────────────
-
-// ─── Payments ─────────────────────────────────────────────────────────────────
-
-model Payment {
-  id            String          @id @default(cuid())
-  userId        String
-  type          BoostType
-  provider      PaymentProvider
-  amount        Int
-  status        PaymentStatus   @default(PENDING)
-  transactionId String?
-  vacancyId     String?
-  days          Int
-  createdAt     DateTime        @default(now())
-
-  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("payments")
 }
 
 // ─── Vacancy subscriptions ────────────────────────────────────────────────────

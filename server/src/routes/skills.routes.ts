@@ -6,8 +6,8 @@ const router = Router();
 
 router.use(authenticate, requireRole('SEEKER'));
 
-router.get('/',              listSkillTests);
-router.get('/:skill',        getSkillTestQuestions);
+router.get('/', listSkillTests);
+router.get('/:skill', getSkillTestQuestions);
 router.post('/:skill/submit', submitSkillTest);
 
 export default router;

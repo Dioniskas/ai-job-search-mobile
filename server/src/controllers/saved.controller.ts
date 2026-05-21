@@ -3,79 +3,89 @@ import { AuthRequest } from '../types';
 import { ok, fail } from '../utils/response';
 import prisma from '../lib/prisma';
 
-async function findSeeker(req: AuthRequest) {
-  return prisma.seekerProfile.findUnique({ where: { userId: req.user!.userId } });
+async function getSeeker(userId: string) {
+  return prisma.seekerProfile.findUnique({ where: { userId } });
 }
 
 // GET /api/saved
 export async function getSavedVacancies(req: AuthRequest, res: Response): Promise<void> {
   try {
-    const seeker = await findSeeker(req);
+    const seeker = await getSeeker(req.user!.userId);
     if (!seeker) { ok(res, { saved: [] }); return; }
 
     const saved = await prisma.savedVacancy.findMany({
       where: { seekerId: seeker.id },
       include: {
         vacancy: {
-          include: { employer: { select: { companyName: true, logoUrl: true } } },
+          include: {
+            employer: { select: { companyName: true, logoUrl: true, city: true } },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    ok(res, { saved });
+    ok(res, { saved: saved.map((s) => s.vacancy) });
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
 // POST /api/saved/:vacancyId
 export async function saveVacancy(req: AuthRequest, res: Response): Promise<void> {
-  const { vacancyId } = req.params;
   try {
-    const seeker = await findSeeker(req);
-    if (!seeker) { fail(res, 'Seeker profile not found'); return; }
+    const { vacancyId } = req.params as { vacancyId: string };
 
-    const record = await prisma.savedVacancy.upsert({
+    const seeker = await getSeeker(req.user!.userId);
+    if (!seeker) { fail(res, 'Создайте профиль соискателя', 400); return; }
+
+    const vacancy = await prisma.vacancy.findUnique({ where: { id: vacancyId } });
+    if (!vacancy) { fail(res, 'Вакансия не найдена', 404); return; }
+
+    await prisma.savedVacancy.upsert({
       where: { seekerId_vacancyId: { seekerId: seeker.id, vacancyId } },
       create: { seekerId: seeker.id, vacancyId },
       update: {},
     });
 
-    ok(res, { saved: record });
+    ok(res, { saved: true });
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
 // DELETE /api/saved/:vacancyId
 export async function unsaveVacancy(req: AuthRequest, res: Response): Promise<void> {
-  const { vacancyId } = req.params;
   try {
-    const seeker = await findSeeker(req);
-    if (!seeker) { fail(res, 'Seeker profile not found'); return; }
+    const { vacancyId } = req.params as { vacancyId: string };
 
-    await prisma.savedVacancy.deleteMany({ where: { seekerId: seeker.id, vacancyId } });
+    const seeker = await getSeeker(req.user!.userId);
+    if (!seeker) { fail(res, 'Профиль не найден', 404); return; }
 
-    ok(res, { deleted: true });
+    await prisma.savedVacancy.deleteMany({
+      where: { seekerId: seeker.id, vacancyId },
+    });
+
+    ok(res, { saved: false });
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
 
 // GET /api/saved/:vacancyId/check
 export async function checkSavedVacancy(req: AuthRequest, res: Response): Promise<void> {
-  const { vacancyId } = req.params;
   try {
-    const seeker = await findSeeker(req);
+    const { vacancyId } = req.params as { vacancyId: string };
+
+    const seeker = await getSeeker(req.user!.userId);
     if (!seeker) { ok(res, { isSaved: false }); return; }
 
-    const record = await prisma.savedVacancy.findUnique({
-      where: { seekerId_vacancyId: { seekerId: seeker.id, vacancyId } },
+    const record = await prisma.savedVacancy.findFirst({
+      where: { seekerId: seeker.id, vacancyId },
     });
 
-    ok(res, { isSaved: !!record });
+    ok(res, { isSaved: record !== null });
   } catch (e) {
-    fail(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+    fail(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
   }
 }
