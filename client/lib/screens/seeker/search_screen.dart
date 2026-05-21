@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import 'vacancy_detail_screen.dart';
 import 'chat_screen.dart';
+import 'filters_screen.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -190,177 +191,36 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
     _loadVacancies(reset: true);
   }
 
-  static const _salarySliderMax = 5000000.0;
-
-  void _openFilters() {
-    var city = _city;
-    var empType = _employmentType;
-    var exp = _experience;
-    var sliderRange = RangeValues(
-      (_salaryMin ?? 0).toDouble(),
-      (_salaryMax ?? _salarySliderMax).toDouble(),
-    );
-    final cityCtrl = TextEditingController(text: city);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheet) {
-          String fmt(double v) =>
-              v >= _salarySliderMax ? '∞' : '${(v ~/ 1000)} тыс.';
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 20, right: 20, top: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      const Text('Фильтры',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          setSheet(() {
-                            city = '';
-                            empType = null;
-                            exp = null;
-                            sliderRange =
-                                const RangeValues(0, _salarySliderMax);
-                          });
-                          cityCtrl.clear();
-                        },
-                        child: const Text('Сбросить'),
-                      ),
-                    ]),
-                    const SizedBox(height: 16),
-                    _sheetField(cityCtrl, 'Город', (v) { city = v; }),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Зарплата, сум',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        Text(
-                          '${fmt(sliderRange.start)} — ${fmt(sliderRange.end)}',
-                          style: const TextStyle(
-                              color: _blue, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    RangeSlider(
-                      values: sliderRange,
-                      min: 0,
-                      max: _salarySliderMax,
-                      divisions: 50,
-                      activeColor: _blue,
-                      onChanged: (v) => setSheet(() => sliderRange = v),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('Тип занятости',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8, runSpacing: 8,
-                      children: _employmentTypes
-                          .map((t) => FilterChip(
-                                label: Text(_employmentLabels[t] ?? t),
-                                selected: empType == t,
-                                onSelected: (v) =>
-                                    setSheet(() => empType = v ? t : null),
-                                selectedColor: const Color(0xFFDBEAFE),
-                                checkmarkColor: _blue,
-                              ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Опыт работы',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8, runSpacing: 8,
-                      children: _experienceOptions
-                          .map((e) => FilterChip(
-                                label: Text(_experienceLabels[e] ?? e),
-                                selected: exp == e,
-                                onSelected: (v) =>
-                                    setSheet(() => exp = v ? e : null),
-                                selectedColor: const Color(0xFFDBEAFE),
-                                checkmarkColor: _blue,
-                              ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _blue,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _city = cityCtrl.text.trim();
-                            _salaryMin = sliderRange.start > 0
-                                ? sliderRange.start.toInt()
-                                : null;
-                            _salaryMax = sliderRange.end < _salarySliderMax
-                                ? sliderRange.end.toInt()
-                                : null;
-                            _employmentType = empType;
-                            _experience = exp;
-                            if (empType != null) {
-                              _selectedCategory = empType!;
-                            } else if (_categoryFilterMap[_selectedCategory] != null) {
-                              _selectedCategory = 'all';
-                            }
-                          });
-                          Navigator.pop(ctx);
-                          _loadVacancies(reset: true);
-                        },
-                        child: const Text('Применить',
-                            style: TextStyle(fontSize: 16)),
-                      ),
-                    ),
-                  ]),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _sheetField(
-    TextEditingController ctrl,
-    String hint,
-    void Function(String) onChanged, {
-    TextInputType keyboard = TextInputType.text,
-  }) =>
-      TextField(
-        controller: ctrl,
-        keyboardType: keyboard,
-        decoration: InputDecoration(
-          hintText: hint,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          border:
-              OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _blue),
-          ),
+  Future<void> _openFilters() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FiltersScreen(
+          city: _city,
+          salaryMin: _salaryMin,
+          salaryMax: _salaryMax,
+          employmentType: _employmentType,
+          experience: _experience,
         ),
-        onChanged: onChanged,
-      );
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _city = result['city'] as String? ?? '';
+        _salaryMin = result['salaryMin'] as int?;
+        _salaryMax = result['salaryMax'] as int?;
+        final empType = result['employmentType'] as String?;
+        _employmentType = empType;
+        _experience = result['experience'] as String?;
+        if (empType != null) {
+          _selectedCategory = empType;
+        } else if (_categoryFilterMap[_selectedCategory] != null) {
+          _selectedCategory = 'all';
+        }
+      });
+      _loadVacancies(reset: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
