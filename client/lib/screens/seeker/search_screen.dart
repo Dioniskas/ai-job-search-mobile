@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import 'vacancy_detail_screen.dart';
+import 'chat_screen.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -704,42 +705,31 @@ class _VacancyCard extends StatelessWidget {
             const SizedBox(height: 14),
 
             // ── Buttons ────────────────────────────────────────────────────
-            Row(children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: onTap,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _blue,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 44),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    textStyle: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  child: const Text('Откликнуться'),
+                  builder: (_) => _ApplySheet(vacancy: vacancy),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onTap,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: textColor,
-                    minimumSize: const Size(0, 44),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(
-                        color: isDark
-                            ? const Color(0xFF3A3A3C)
-                            : const Color(0xFFE5E5EA)),
-                    textStyle: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  child: const Text('Связаться'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _blue,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
                 ),
+                child: const Text('Откликнуться'),
               ),
-            ]),
+            ),
           ]),
         ),
       ),
@@ -783,4 +773,278 @@ class _VacancyCard extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w500)),
       );
+}
+
+// ── Apply Sheet ────────────────────────────────────────────────────────────────
+
+class _ApplySheet extends StatefulWidget {
+  const _ApplySheet({required this.vacancy});
+  final dynamic vacancy;
+
+  @override
+  State<_ApplySheet> createState() => _ApplySheetState();
+}
+
+class _ApplySheetState extends State<_ApplySheet> {
+  List<dynamic> _resumes = [];
+  bool _loading = true;
+  String? _selectedResumeId;
+  bool _showCover = false;
+  bool _applying = false;
+  final _coverCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadResumes();
+  }
+
+  @override
+  void dispose() {
+    _coverCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadResumes() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      final list = await auth.withAuth((t) => ApiService.getResumes(t));
+      if (!mounted) return;
+      setState(() {
+        _resumes = list;
+        _loading = false;
+        if (list.isNotEmpty) {
+          final main = list.firstWhere(
+              (r) => r['isMain'] == true,
+              orElse: () => list.first);
+          _selectedResumeId = main['id'] as String?;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _apply() async {
+    if (_selectedResumeId == null) return;
+    setState(() => _applying = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final vacancyId = widget.vacancy['id'] as String;
+      final coverLetter =
+          _showCover ? _coverCtrl.text.trim() : null;
+      await auth.withAuth((t) => ApiService.applyToVacancy(
+            t,
+            vacancyId,
+            _selectedResumeId!,
+            coverLetter: coverLetter,
+          ));
+      if (!mounted) return;
+      Navigator.pop(context);
+      final employer =
+          widget.vacancy['employer'] as Map<String, dynamic>? ?? {};
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatConversationScreen(
+            vacancyId: vacancyId,
+            employerId: employer['id'] as String? ?? '',
+            vacancyTitle:
+                widget.vacancy['title'] as String? ?? 'Вакансия',
+            companyName:
+                employer['companyName'] as String? ?? '',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _applying = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final vacancy = widget.vacancy as Map<String, dynamic>;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header ──────────────────────────────────────────────────
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Отклик на вакансию',
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          Text(
+            vacancy['title'] as String? ?? '',
+            style:
+                const TextStyle(color: _slate, fontSize: 14),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Resume list ──────────────────────────────────────────────
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else if (_resumes.isEmpty)
+            const Text('Нет резюме. Создайте резюме в разделе "Карьера".',
+                style: TextStyle(color: _slate))
+          else
+            ...List.generate(_resumes.length, (i) {
+              final r = _resumes[i] as Map<String, dynamic>;
+              final rid = r['id'] as String;
+              final photoUrl = r['photoUrl'] as String?;
+              final title = r['title'] as String? ?? 'Резюме';
+              final salaryMin = r['salaryMin'] as int?;
+              final salaryMax = r['salaryMax'] as int?;
+              String salary = '';
+              if (salaryMin != null && salaryMax != null) {
+                salary = '$salaryMin – $salaryMax UZS';
+              } else if (salaryMin != null) {
+                salary = 'от $salaryMin UZS';
+              } else if (salaryMax != null) {
+                salary = 'до $salaryMax UZS';
+              }
+              final selected = _selectedResumeId == rid;
+
+              return GestureDetector(
+                onTap: () =>
+                    setState(() => _selectedResumeId = rid),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: selected
+                          ? _blue
+                          : (isDark
+                              ? const Color(0xFF2C2C2E)
+                              : const Color(0xFFE5E5EA)),
+                      width: selected ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: RadioListTile<String>(
+                    value: rid,
+                    groupValue: _selectedResumeId,
+                    onChanged: (v) =>
+                        setState(() => _selectedResumeId = v),
+                    activeColor: _blue,
+                    contentPadding:
+                        const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                    title: Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15)),
+                    subtitle: salary.isNotEmpty
+                        ? Text(salary,
+                            style: const TextStyle(
+                                color: _slate, fontSize: 13))
+                        : null,
+                    secondary: CircleAvatar(
+                      radius: 20,
+                      backgroundImage: photoUrl != null
+                          ? NetworkImage(photoUrl)
+                          : null,
+                      backgroundColor:
+                          const Color(0xFFDBEAFE),
+                      child: photoUrl == null
+                          ? Text(
+                              title.isNotEmpty
+                                  ? title[0].toUpperCase()
+                                  : 'R',
+                              style: const TextStyle(
+                                  color: _blue,
+                                  fontWeight: FontWeight.bold))
+                          : null,
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+          const SizedBox(height: 12),
+
+          // ── Cover letter ─────────────────────────────────────────────
+          if (_showCover) ...[
+            TextField(
+              controller: _coverCtrl,
+              minLines: 3,
+              maxLines: 6,
+              decoration: InputDecoration(
+                hintText: 'Сопроводительное письмо...',
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _blue),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // ── Actions ──────────────────────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed:
+                  (_applying || _selectedResumeId == null)
+                      ? null
+                      : _apply,
+              style: FilledButton.styleFrom(
+                backgroundColor: _blue,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _applying
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Text('Откликнуться',
+                      style: TextStyle(fontSize: 16)),
+            ),
+          ),
+          if (!_showCover) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: () =>
+                    setState(() => _showCover = true),
+                child: const Text('Добавить сопроводительное'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

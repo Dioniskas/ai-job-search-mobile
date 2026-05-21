@@ -1018,6 +1018,39 @@ static Future<Map<String, dynamic>> aiImproveResumeText(String token, {
     return data as List<dynamic>;
   }
 
+  // ── Chat ─────────────────────────────────────────────────────────────────
+
+  static Future<List<dynamic>> getChatConversations(String token) async {
+    final response = await _safeGet(
+      Uri.parse('$baseUrl/api/chat/conversations'),
+      headers: _headers(token: token),
+    );
+    final data = _parse(response);
+    return data['conversations'] as List<dynamic>;
+  }
+
+  static Future<List<dynamic>> getChatMessages(
+      String token, String vacancyId, String employerId) async {
+    final uri = Uri.parse('$baseUrl/api/chat/messages').replace(
+      queryParameters: {'vacancyId': vacancyId, 'employerId': employerId},
+    );
+    final response = await _safeGet(uri, headers: _headers(token: token));
+    final data = _parse(response);
+    return data['messages'] as List<dynamic>;
+  }
+
+  static Future<Map<String, dynamic>> sendChatMessage(
+      String token, String vacancyId, String employerId, String text) async {
+    final response = await _safePost(
+      Uri.parse('$baseUrl/api/chat/messages'),
+      headers: _headers(token: token),
+      body: json.encode(
+          {'vacancyId': vacancyId, 'employerId': employerId, 'text': text}),
+    );
+    final data = _parse(response);
+    return data['message'] as Map<String, dynamic>;
+  }
+
   // ── Reports ───────────────────────────────────────────────────────────────
 
   static Future<void> createReport(
