@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const upload_middleware_1 = require("../middleware/upload.middleware");
+const resume_controller_1 = require("../controllers/resume.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate, (0, auth_middleware_1.requireRole)('SEEKER'));
+router.get('/', resume_controller_1.getResumes);
+router.post('/upload', (0, upload_middleware_1.uploadPdf)('pdf'), resume_controller_1.uploadPdf);
+router.post('/improve', (0, upload_middleware_1.uploadPdf)('pdf'), resume_controller_1.improvePdf);
+router.post('/generate/text', resume_controller_1.generateFromText);
+router.post('/generate/voice', (0, upload_middleware_1.uploadAudio)('audio'), resume_controller_1.generateFromVoice);
+router.get('/:id/pdf', resume_controller_1.generateResumePdf);
+router.post('/:id/score', resume_controller_1.scoreResumeCtrl);
+router.put('/:id', resume_controller_1.updateResume);
+router.delete('/:id', resume_controller_1.deleteResume);
+exports.default = router;

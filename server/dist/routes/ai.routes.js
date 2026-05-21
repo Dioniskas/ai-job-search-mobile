@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const ai_controller_1 = require("../controllers/ai.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate);
+router.post('/interview-prep', (0, auth_middleware_1.requireRole)('SEEKER'), ai_controller_1.aiInterviewPrep);
+router.post('/interview-feedback', (0, auth_middleware_1.requireRole)('SEEKER'), ai_controller_1.aiInterviewFeedback);
+router.post('/match-percent', ai_controller_1.aiMatchPercent);
+router.post('/match-vacancies', ai_controller_1.aiMatchVacancies);
+router.post('/match-resumes', ai_controller_1.aiMatchResumes);
+router.post('/cover-letter', ai_controller_1.aiCoverLetter);
+router.post('/salary-estimate', ai_controller_1.aiSalaryEstimate);
+exports.default = router;

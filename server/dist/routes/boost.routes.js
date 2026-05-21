@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const boost_controller_1 = require("../controllers/boost.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate);
+router.get('/status', boost_controller_1.getBoostStatus);
+router.post('/resume', (0, auth_middleware_1.requireRole)('SEEKER'), boost_controller_1.boostResume);
+router.post('/vacancy', (0, auth_middleware_1.requireRole)('EMPLOYER'), boost_controller_1.boostVacancy);
+exports.default = router;

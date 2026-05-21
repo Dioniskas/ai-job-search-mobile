@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const upload_middleware_1 = require("../middleware/upload.middleware");
+const seeker_controller_1 = require("../controllers/seeker.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate, (0, auth_middleware_1.requireRole)('SEEKER'));
+router.get('/profile', seeker_controller_1.getProfile);
+router.put('/profile', seeker_controller_1.upsertProfile);
+router.post('/profile/photo', (0, upload_middleware_1.uploadSingle)('photo'), seeker_controller_1.uploadPhoto);
+router.put('/profile/visibility', seeker_controller_1.setVisibility);
+exports.default = router;

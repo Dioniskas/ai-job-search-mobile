@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const skills_controller_1 = require("../controllers/skills.controller");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate, (0, auth_middleware_1.requireRole)('SEEKER'));
+router.get('/', skills_controller_1.listSkillTests);
+router.get('/:skill', skills_controller_1.getSkillTestQuestions);
+router.post('/:skill/submit', skills_controller_1.submitSkillTest);
+exports.default = router;
