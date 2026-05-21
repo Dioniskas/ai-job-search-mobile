@@ -71,6 +71,7 @@ model Resume {
   title        String
   content      Json
   pdfUrl       String?
+  photoUrl     String?
   isAiGenerated Boolean @default(false)
   skills       String[]
   experience   String?

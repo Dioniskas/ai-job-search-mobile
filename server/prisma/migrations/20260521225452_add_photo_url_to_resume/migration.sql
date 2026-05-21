@@ -1,0 +1,1 @@
+ALTER TABLE "resumes" ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
