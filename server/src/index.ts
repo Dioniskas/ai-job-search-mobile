@@ -89,7 +89,7 @@ app.get('/health', (_req, res) => {
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  initFonts().catch(() => {});
+  initFonts();
 
   const rawDomain =
     process.env.RAILWAY_PUBLIC_DOMAIN ?? process.env.FRONTEND_URL;
