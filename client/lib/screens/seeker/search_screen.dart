@@ -15,6 +15,17 @@ const _employmentTypes = [
   'FULL_TIME', 'PART_TIME', 'REMOTE', 'CONTRACT', 'INTERNSHIP',
 ];
 
+// Category chip key → employmentType filter value (null = no filter)
+const _categoryFilterMap = <String, String?>{
+  'all':        null,
+  'near':       null,
+  'PART_TIME':  'PART_TIME',
+  'CONTRACT':   'CONTRACT',
+  'age16':      null,
+  'REMOTE':     'REMOTE',
+  'INTERNSHIP': 'INTERNSHIP',
+};
+
 const _employmentLabels = {
   'FULL_TIME': 'Полная занятость',
   'PART_TIME': 'Частичная',
@@ -174,7 +185,7 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
   void _selectCategory(String cat) {
     setState(() {
       _selectedCategory = cat;
-      _employmentType = cat == 'all' ? null : cat;
+      _employmentType = _categoryFilterMap[cat];
     });
     _loadVacancies(reset: true);
   }
@@ -307,10 +318,9 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
                                 : null;
                             _employmentType = empType;
                             _experience = exp;
-                            if (empType == 'REMOTE') _selectedCategory = 'REMOTE';
-                            else if (empType == 'PART_TIME') _selectedCategory = 'PART_TIME';
-                            else if (empType == 'CONTRACT') _selectedCategory = 'CONTRACT';
-                            else if (empType == null && _selectedCategory != 'all') {
+                            if (empType != null) {
+                              _selectedCategory = empType!;
+                            } else if (_categoryFilterMap[_selectedCategory] != null) {
                               _selectedCategory = 'all';
                             }
                           });
@@ -424,13 +434,19 @@ class _SeekerSearchScreenState extends State<SeekerSearchScreen> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
-                  _categoryChip('all', 'Для вас'),
+                  _categoryChip('all',        'Для вас'),
                   const SizedBox(width: 8),
-                  _categoryChip('REMOTE', 'Удалённая'),
+                  _categoryChip('near',       'У дома'),
                   const SizedBox(width: 8),
-                  _categoryChip('PART_TIME', 'Подработка'),
+                  _categoryChip('PART_TIME',  'Подработка'),
                   const SizedBox(width: 8),
-                  _categoryChip('CONTRACT', 'Вахта'),
+                  _categoryChip('CONTRACT',   'Вахта'),
+                  const SizedBox(width: 8),
+                  _categoryChip('age16',      'От 16 лет'),
+                  const SizedBox(width: 8),
+                  _categoryChip('REMOTE',     'Удалённая'),
+                  const SizedBox(width: 8),
+                  _categoryChip('INTERNSHIP', 'Стажировка'),
                 ]),
               ),
               const SizedBox(height: 12),

@@ -297,6 +297,41 @@ class _SeekerHomeScreenState extends State<SeekerHomeScreen> {
                 ]),
 
                 const SizedBox(height: 24),
+                const Text('Быстрые действия',
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1C1C1E))),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 110,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _QuickActionCard(
+                          icon: Icons.phone_outlined,
+                          label: 'Звонки через приложение',
+                          color: const Color(0xFF2563EB)),
+                      const SizedBox(width: 10),
+                      _QuickActionCard(
+                          icon: Icons.arrow_upward_rounded,
+                          label: 'Поднять резюме в поиске',
+                          color: const Color(0xFF16A34A)),
+                      const SizedBox(width: 10),
+                      _QuickActionCard(
+                          icon: Icons.location_on_outlined,
+                          label: 'Вакансии рядом с вами',
+                          color: const Color(0xFFF97316)),
+                      const SizedBox(width: 10),
+                      _QuickActionCard(
+                          icon: Icons.star_outline_rounded,
+                          label: 'Оценить место работы',
+                          color: const Color(0xFF7C3AED)),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
 
                 // ── 2. Моё резюме ────────────────────────────────────────
                 if (main != null) ...[
@@ -635,6 +670,48 @@ class _StatChip extends StatelessWidget {
         Text(label,
             style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.6))),
       ]),
+    );
+  }
+}
+
+// ── Quick Action Card ─────────────────────────────────────────────────────────
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Скоро будет доступно')),
+      ),
+      child: Container(
+        width: 130,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE5E5EA)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 12, color: Color(0xFF8E8E93))),
+          ],
+        ),
+      ),
     );
   }
 }
