@@ -18,7 +18,7 @@ import {
 
 // ── Font discovery for Cyrillic support ───────────────────────────────────────
 const DEJAVU_LOCAL = nodePath.join(process.cwd(), 'fonts', 'DejaVuSans.ttf');
-const DEJAVU_URL   = 'https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf';
+const DEJAVU_URL   = 'https://raw.githubusercontent.com/dejavu-fonts/dejavu-fonts/master/ttf/DejaVuSans.ttf';
 
 function findCyrillicFont(): string | undefined {
   const candidates = [
