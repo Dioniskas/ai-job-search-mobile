@@ -298,21 +298,12 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
 
   const doc = new PDFDocument({ margin: 50 });
 
-  doc.on('error', (err) => {
-    console.error('[pdf] stream error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'PDF generation failed' });
-    }
+  const chunks: Buffer[] = [];
+  doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+  const pdfDone = new Promise<Buffer>((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
   });
-
-  res.on('close', () => {
-    doc.end();
-  });
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
-
-  doc.pipe(res);
 
   if (fontPath) {
     doc.registerFont('DejaVu', fontPath);
@@ -346,6 +337,10 @@ export async function generateResumePdf(req: AuthRequest, res: Response): Promis
   }
 
   doc.end();
+  const pdfBuffer = await pdfDone;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
+  res.send(pdfBuffer);
 }
 
 // DELETE /api/resume/:id
