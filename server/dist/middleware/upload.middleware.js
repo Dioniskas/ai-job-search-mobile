@@ -21,8 +21,7 @@ function makeUploader(allowedMime, maxMb) {
         },
     });
 }
-// image/jpg is sent by some Android devices alongside the standard image/jpeg
-const imageUploader = makeUploader(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'], 5);
+const imageUploader = makeUploader(['image/jpeg', 'image/png', 'image/webp'], 5);
 const pdfUploader = makeUploader(['application/pdf'], 10);
 const audioUploader = makeUploader(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'video/webm'], 25);
 function wrapSingle(uploader, fieldName) {

@@ -22,32 +22,25 @@ async function getProfile(req, res) {
     }
 }
 async function upsertProfile(req, res) {
-    const { firstName, lastName, middleName, age, phone, city, about, searchStatus } = req.body;
-    const allowedStatuses = ['ACTIVE', 'OPEN', 'NOT_LOOKING'];
-    // Partial update: only include fields that were actually sent
-    const updateData = {};
-    if (firstName !== undefined)
-        updateData['firstName'] = firstName;
-    if (lastName !== undefined)
-        updateData['lastName'] = lastName;
-    if (middleName !== undefined)
-        updateData['middleName'] = middleName ?? null;
-    if (age !== undefined)
-        updateData['age'] = age ? parseInt(age, 10) : null;
-    if (phone !== undefined)
-        updateData['phone'] = phone ?? null;
-    if (city !== undefined)
-        updateData['city'] = city ?? null;
-    if (about !== undefined)
-        updateData['about'] = about ?? null;
-    if (searchStatus && allowedStatuses.includes(searchStatus)) {
-        updateData['searchStatus'] = searchStatus;
+    const { firstName, lastName, middleName, age, phone, city, about } = req.body;
+    if (!firstName || !lastName) {
+        (0, response_1.fail)(res, 'firstName and lastName are required');
+        return;
     }
+    const data = {
+        firstName,
+        lastName,
+        middleName: middleName ?? null,
+        age: age ? parseInt(age, 10) : null,
+        phone: phone ?? null,
+        city: city ?? null,
+        about: about ?? null,
+    };
     try {
         const profile = await prisma_1.default.seekerProfile.upsert({
             where: { userId: req.user.userId },
-            create: { userId: req.user.userId, firstName: firstName ?? '', lastName: lastName ?? '', ...updateData },
-            update: updateData,
+            create: { userId: req.user.userId, ...data },
+            update: data,
         });
         (0, response_1.ok)(res, { profile });
     }
@@ -61,7 +54,7 @@ async function uploadPhoto(req, res) {
         return;
     }
     try {
-        const photoUrl = await (0, imagekit_service_1.uploadBuffer)(req.file.buffer, req.file.mimetype, 'ai-job-search/avatars', `seeker-${req.user.userId}-${Date.now()}`);
+        const photoUrl = await (0, imagekit_service_1.uploadBuffer)(req.file.buffer, req.file.mimetype, 'ai-job-search/avatars', `seeker-${req.user.userId}`);
         const profile = await prisma_1.default.seekerProfile.upsert({
             where: { userId: req.user.userId },
             create: { userId: req.user.userId, firstName: '', lastName: '', photoUrl },

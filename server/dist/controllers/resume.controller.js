@@ -275,6 +275,7 @@ async function generateResumePdf(req, res) {
         where: { userId: req.user.userId },
     });
     if (!profile) {
+        console.error('[pdf] error:', 'Profile not found');
         (0, response_1.fail)(res, 'Profile not found', 404);
         return;
     }
@@ -282,24 +283,20 @@ async function generateResumePdf(req, res) {
         where: { id, seekerId: profile.id },
     });
     if (!existing) {
+        console.error('[pdf] error:', 'Resume not found');
         (0, response_1.fail)(res, 'Resume not found', 404);
         return;
     }
+    console.log('[pdf] generating for resume:', id, 'user:', req.user?.userId);
     const content = existing.content;
     const fontPath = initFonts();
     const doc = new pdfkit_1.default({ margin: 50 });
-    doc.on('error', (err) => {
-        console.error('[pdf] stream error:', err);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'PDF generation failed' });
-        }
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    const pdfDone = new Promise((resolve, reject) => {
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
     });
-    res.on('close', () => {
-        doc.end();
-    });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
-    doc.pipe(res);
     if (fontPath) {
         doc.registerFont('DejaVu', fontPath);
         doc.font('DejaVu');
@@ -326,6 +323,10 @@ async function generateResumePdf(req, res) {
         doc.moveDown();
     }
     doc.end();
+    const pdfBuffer = await pdfDone;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="resume-${id}.pdf"`);
+    res.send(pdfBuffer);
 }
 // DELETE /api/resume/:id
 async function deleteResume(req, res) {

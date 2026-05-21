@@ -6,142 +6,180 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.listVacancies = listVacancies;
 exports.getMapVacancies = getMapVacancies;
 exports.getEmployerVacancies = getEmployerVacancies;
-exports.aiGenerateDescription = aiGenerateDescription;
 exports.getVacancy = getVacancy;
 exports.createVacancy = createVacancy;
 exports.updateVacancy = updateVacancy;
 exports.deleteVacancy = deleteVacancy;
+exports.aiVacancyDescription = aiVacancyDescription;
 exports.applyToVacancy = applyToVacancy;
 const response_1 = require("../utils/response");
-const groq_service_1 = require("../services/ai/groq.service");
 const prisma_1 = __importDefault(require("../lib/prisma"));
+const groq_service_1 = require("../services/ai/groq.service");
+// ── List vacancies (public-ish, requires auth) ─────────────────────────────────
 async function listVacancies(req, res) {
     try {
-        const { search, city, salaryMin, salaryMax, employmentType, experience, page: pageStr, limit: limitStr } = req.query;
-        const page = Math.max(1, parseInt(pageStr ?? '1', 10));
-        const limit = Math.min(50, Math.max(1, parseInt(limitStr ?? '20', 10)));
-        const skip = (page - 1) * limit;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const where = { isActive: true, isModerated: true };
-        if (search)
-            where['title'] = { contains: search, mode: 'insensitive' };
-        if (city)
-            where['city'] = { contains: city, mode: 'insensitive' };
-        if (salaryMin)
-            where['salaryMax'] = { gte: Number(salaryMin) };
-        if (salaryMax)
-            where['salaryMin'] = { lte: Number(salaryMax) };
-        if (employmentType)
-            where['employmentType'] = employmentType;
-        if (experience)
-            where['experience'] = experience;
-        const [vacancies, total] = await Promise.all([
-            prisma_1.default.vacancy.findMany({
-                where,
-                include: { employer: { select: { companyName: true, logoUrl: true, city: true } } },
-                orderBy: [{ boostedUntil: 'desc' }, { createdAt: 'desc' }],
-                skip,
-                take: limit,
-            }),
-            prisma_1.default.vacancy.count({ where }),
-        ]);
-        (0, response_1.ok)(res, { data: vacancies, total, page, totalPages: Math.ceil(total / limit) });
+        const { search, city, salaryMin, salaryMax, employmentType, experience } = req.query;
+        const where = { isActive: true };
+        if (search) {
+            where.title = { contains: search, mode: 'insensitive' };
+        }
+        if (city) {
+            where.city = { contains: city, mode: 'insensitive' };
+        }
+        if (employmentType) {
+            where.employmentType = employmentType;
+        }
+        if (experience) {
+            where.experience = experience;
+        }
+        if (salaryMin || salaryMax) {
+            where.salaryMin = {};
+            if (salaryMin)
+                where.salaryMin.gte = parseInt(salaryMin, 10);
+            if (salaryMax)
+                where.salaryMin.lte = parseInt(salaryMax, 10);
+        }
+        const now = new Date();
+        const vacancies = await prisma_1.default.vacancy.findMany({
+            where,
+            include: {
+                employer: {
+                    select: { companyName: true, logoUrl: true, city: true },
+                },
+            },
+            orderBy: [
+                { boostedUntil: 'desc' },
+                { createdAt: 'desc' },
+            ],
+            take: 50,
+        });
+        // Mark boosted
+        const result = vacancies.map((v) => ({
+            ...v,
+            isBoosted: v.boostedUntil !== null && v.boostedUntil > now,
+        }));
+        (0, response_1.ok)(res, { vacancies: result });
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
+// ── Map vacancies (with lat/lng only) ──────────────────────────────────────────
 async function getMapVacancies(req, res) {
     try {
         const vacancies = await prisma_1.default.vacancy.findMany({
-            where: { isActive: true, isModerated: true, lat: { not: null }, lng: { not: null } },
-            select: {
-                id: true, title: true, city: true,
-                salaryMin: true, salaryMax: true,
-                lat: true, lng: true,
-                employer: { select: { companyName: true } },
+            where: {
+                isActive: true,
+                lat: { not: null },
+                lng: { not: null },
             },
-            take: 200,
+            select: {
+                id: true,
+                title: true,
+                salaryMin: true,
+                salaryMax: true,
+                lat: true,
+                lng: true,
+                city: true,
+                employer: { select: { companyName: true, logoUrl: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
         });
         (0, response_1.ok)(res, { vacancies });
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
+// ── Get employer's own vacancies ────────────────────────────────────────────────
 async function getEmployerVacancies(req, res) {
     try {
-        const employer = await prisma_1.default.employer.findUnique({ where: { userId: req.user.userId } });
+        const employer = await prisma_1.default.employer.findUnique({
+            where: { userId: req.user.userId },
+        });
         if (!employer) {
             (0, response_1.ok)(res, { vacancies: [] });
             return;
         }
+        const now = new Date();
         const vacancies = await prisma_1.default.vacancy.findMany({
             where: { employerId: employer.id },
-            include: { _count: { select: { applications: true } } },
             orderBy: { createdAt: 'desc' },
         });
-        (0, response_1.ok)(res, { vacancies });
+        const result = vacancies.map((v) => ({
+            ...v,
+            isBoosted: v.boostedUntil !== null && v.boostedUntil > now,
+        }));
+        (0, response_1.ok)(res, { vacancies: result });
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
-async function aiGenerateDescription(req, res) {
-    const { title, requirements, conditions } = req.body;
-    if (!title) {
-        (0, response_1.fail)(res, 'title is required');
-        return;
-    }
-    try {
-        const description = await (0, groq_service_1.generateVacancyDescription)({ title, requirements, conditions });
-        (0, response_1.ok)(res, { description });
-    }
-    catch (e) {
-        (0, response_1.fail)(res, `AI error: ${e instanceof Error ? e.message : 'unknown'}`);
-    }
-}
+// ── Get single vacancy ─────────────────────────────────────────────────────────
 async function getVacancy(req, res) {
-    const { id } = req.params;
     try {
+        const { id } = req.params;
         const vacancy = await prisma_1.default.vacancy.findUnique({
             where: { id },
-            include: { employer: true },
+            include: {
+                employer: {
+                    select: {
+                        id: true,
+                        companyName: true,
+                        logoUrl: true,
+                        city: true,
+                        website: true,
+                        description: true,
+                    },
+                },
+            },
         });
-        if (!vacancy || !vacancy.isModerated) {
-            (0, response_1.fail)(res, 'Vacancy not found');
+        if (!vacancy) {
+            (0, response_1.fail)(res, 'Вакансия не найдена', 404);
             return;
         }
-        await prisma_1.default.vacancy.update({ where: { id }, data: { viewCount: { increment: 1 } } });
+        // Increment view count
+        await prisma_1.default.vacancy.update({
+            where: { id },
+            data: { viewCount: { increment: 1 } },
+        }).catch(() => null);
+        // Similar vacancies (same city or employer, different id)
         const similar = await prisma_1.default.vacancy.findMany({
             where: {
-                isActive: true,
-                isModerated: true,
                 id: { not: id },
+                isActive: true,
                 OR: [
-                    ...(vacancy.employmentType ? [{ employmentType: vacancy.employmentType }] : []),
-                    ...(vacancy.city ? [{ city: vacancy.city }] : []),
+                    { city: vacancy.city ?? undefined },
+                    { employerId: vacancy.employerId },
                 ],
             },
-            include: { employer: { select: { companyName: true, logoUrl: true } } },
+            include: {
+                employer: { select: { companyName: true, logoUrl: true } },
+            },
             take: 5,
+            orderBy: { createdAt: 'desc' },
         });
         (0, response_1.ok)(res, { vacancy, similar });
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
+// ── Create vacancy ─────────────────────────────────────────────────────────────
 async function createVacancy(req, res) {
-    const { title, description, salaryMin, salaryMax, city, lat, lng, employmentType, experience } = req.body;
-    if (!title || !description) {
-        (0, response_1.fail)(res, 'title and description are required');
-        return;
-    }
     try {
-        const employer = await prisma_1.default.employer.findUnique({ where: { userId: req.user.userId } });
+        const employer = await prisma_1.default.employer.findUnique({
+            where: { userId: req.user.userId },
+        });
         if (!employer) {
-            (0, response_1.fail)(res, 'Employer profile not found. Please complete your profile first.');
+            (0, response_1.fail)(res, 'Сначала создайте профиль компании', 400);
+            return;
+        }
+        const { title, description, salaryMin, salaryMax, city, lat, lng, employmentType, experience, } = req.body;
+        if (!title || !description) {
+            (0, response_1.fail)(res, 'title и description обязательны');
             return;
         }
         const vacancy = await prisma_1.default.vacancy.create({
@@ -149,90 +187,141 @@ async function createVacancy(req, res) {
                 employerId: employer.id,
                 title,
                 description,
-                salaryMin: salaryMin ? parseInt(salaryMin) : null,
-                salaryMax: salaryMax ? parseInt(salaryMax) : null,
+                salaryMin: salaryMin ?? null,
+                salaryMax: salaryMax ?? null,
                 city: city ?? null,
-                lat: lat ? parseFloat(lat) : null,
-                lng: lng ? parseFloat(lng) : null,
+                lat: lat ?? null,
+                lng: lng ?? null,
                 employmentType: employmentType ?? null,
                 experience: experience ?? null,
             },
+            include: {
+                employer: { select: { companyName: true, logoUrl: true } },
+            },
         });
-        (0, response_1.ok)(res, { vacancy });
+        (0, response_1.ok)(res, { vacancy }, 201);
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
+// ── Update vacancy ─────────────────────────────────────────────────────────────
 async function updateVacancy(req, res) {
-    const { id } = req.params;
-    const { isActive, title, description, salaryMin, salaryMax, city, employmentType, experience } = req.body;
     try {
-        const employer = await prisma_1.default.employer.findUnique({ where: { userId: req.user.userId } });
+        const { id } = req.params;
+        const employer = await prisma_1.default.employer.findUnique({
+            where: { userId: req.user.userId },
+        });
         if (!employer) {
-            (0, response_1.fail)(res, 'Employer profile not found');
+            (0, response_1.fail)(res, 'Профиль работодателя не найден', 404);
             return;
         }
-        const existing = await prisma_1.default.vacancy.findUnique({ where: { id } });
-        if (!existing || existing.employerId !== employer.id) {
-            (0, response_1.fail)(res, 'Vacancy not found or access denied');
+        const existing = await prisma_1.default.vacancy.findFirst({
+            where: { id, employerId: employer.id },
+        });
+        if (!existing) {
+            (0, response_1.fail)(res, 'Вакансия не найдена', 404);
             return;
         }
+        const { title, description, salaryMin, salaryMax, city, lat, lng, employmentType, experience, isActive, } = req.body;
         const vacancy = await prisma_1.default.vacancy.update({
             where: { id },
             data: {
-                ...(isActive !== undefined ? { isActive } : {}),
-                ...(title !== undefined ? { title } : {}),
-                ...(description !== undefined ? { description } : {}),
-                ...(salaryMin !== undefined ? { salaryMin: Number(salaryMin) } : {}),
-                ...(salaryMax !== undefined ? { salaryMax: Number(salaryMax) } : {}),
-                ...(city !== undefined ? { city } : {}),
-                ...(employmentType !== undefined ? { employmentType } : {}),
-                ...(experience !== undefined ? { experience } : {}),
+                ...(title !== undefined && { title }),
+                ...(description !== undefined && { description }),
+                ...(salaryMin !== undefined && { salaryMin }),
+                ...(salaryMax !== undefined && { salaryMax }),
+                ...(city !== undefined && { city }),
+                ...(lat !== undefined && { lat }),
+                ...(lng !== undefined && { lng }),
+                ...(employmentType !== undefined && { employmentType }),
+                ...(experience !== undefined && { experience }),
+                ...(isActive !== undefined && { isActive }),
             },
         });
         (0, response_1.ok)(res, { vacancy });
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
+// ── Delete vacancy ─────────────────────────────────────────────────────────────
 async function deleteVacancy(req, res) {
-    const { id } = req.params;
     try {
-        const employer = await prisma_1.default.employer.findUnique({ where: { userId: req.user.userId } });
+        const { id } = req.params;
+        const employer = await prisma_1.default.employer.findUnique({
+            where: { userId: req.user.userId },
+        });
         if (!employer) {
-            (0, response_1.fail)(res, 'Employer profile not found');
+            (0, response_1.fail)(res, 'Профиль не найден', 404);
             return;
         }
-        const existing = await prisma_1.default.vacancy.findUnique({ where: { id } });
-        if (!existing || existing.employerId !== employer.id) {
-            (0, response_1.fail)(res, 'Vacancy not found or access denied');
+        const existing = await prisma_1.default.vacancy.findFirst({
+            where: { id, employerId: employer.id },
+        });
+        if (!existing) {
+            (0, response_1.fail)(res, 'Вакансия не найдена', 404);
             return;
         }
         await prisma_1.default.vacancy.delete({ where: { id } });
         (0, response_1.ok)(res, { deleted: true });
     }
     catch (e) {
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }
-async function applyToVacancy(req, res) {
-    const { id: vacancyId } = req.params;
-    const { resumeId, coverLetter } = req.body;
-    if (!resumeId) {
-        (0, response_1.fail)(res, 'resumeId is required');
-        return;
-    }
+// ── AI vacancy description ─────────────────────────────────────────────────────
+async function aiVacancyDescription(req, res) {
     try {
-        const seeker = await prisma_1.default.seekerProfile.findUnique({ where: { userId: req.user.userId } });
-        if (!seeker) {
-            (0, response_1.fail)(res, 'Seeker profile not found. Please complete your profile first.');
+        const { title, requirements, conditions } = req.body;
+        if (!title) {
+            (0, response_1.fail)(res, 'title обязателен');
             return;
         }
-        const vacancy = await prisma_1.default.vacancy.findUnique({ where: { id: vacancyId } });
-        if (!vacancy) {
-            (0, response_1.fail)(res, 'Vacancy not found');
+        const description = await (0, groq_service_1.generateVacancyDescription)({ title, requirements, conditions });
+        (0, response_1.ok)(res, { description });
+    }
+    catch (e) {
+        (0, response_1.fail)(res, `Ошибка AI: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+}
+// ── Apply to vacancy ───────────────────────────────────────────────────────────
+async function applyToVacancy(req, res) {
+    try {
+        const { id: vacancyId } = req.params;
+        const { resumeId, coverLetter } = req.body;
+        if (!resumeId) {
+            (0, response_1.fail)(res, 'resumeId обязателен');
+            return;
+        }
+        const seeker = await prisma_1.default.seekerProfile.findUnique({
+            where: { userId: req.user.userId },
+        });
+        if (!seeker) {
+            (0, response_1.fail)(res, 'Создайте профиль соискателя', 400);
+            return;
+        }
+        const vacancy = await prisma_1.default.vacancy.findUnique({
+            where: { id: vacancyId },
+            include: { employer: { select: { id: true, userId: true } } },
+        });
+        if (!vacancy || !vacancy.isActive) {
+            (0, response_1.fail)(res, 'Вакансия не найдена или закрыта', 404);
+            return;
+        }
+        const resume = await prisma_1.default.resume.findFirst({
+            where: { id: resumeId, seekerId: seeker.id },
+        });
+        if (!resume) {
+            (0, response_1.fail)(res, 'Резюме не найдено', 404);
+            return;
+        }
+        // Check if already applied
+        const existing = await prisma_1.default.application.findFirst({
+            where: { resumeId, vacancyId },
+        });
+        if (existing) {
+            (0, response_1.fail)(res, 'Вы уже откликались на эту вакансию', 409);
             return;
         }
         const application = await prisma_1.default.application.create({
@@ -240,32 +329,22 @@ async function applyToVacancy(req, res) {
                 resumeId,
                 vacancyId,
                 seekerId: seeker.id,
-                employerId: vacancy.employerId,
+                employerId: vacancy.employer.id,
                 coverLetter: coverLetter ?? null,
             },
         });
         // Notify employer
-        const employer = await prisma_1.default.employer.findUnique({
-            where: { id: vacancy.employerId },
-            select: { userId: true },
-        });
-        if (employer) {
-            const name = [seeker.firstName, seeker.lastName].filter(Boolean).join(' ') || 'Соискатель';
-            await prisma_1.default.notification.create({
-                data: {
-                    userId: employer.userId,
-                    type: 'NEW_APPLICATION',
-                    text: `${name} откликнулся на вакансию «${vacancy.title}»`,
-                },
-            });
-        }
-        (0, response_1.ok)(res, { application });
+        await prisma_1.default.notification.create({
+            data: {
+                userId: vacancy.employer.userId,
+                type: 'NEW_APPLICATION',
+                text: `Новый отклик на вакансию "${vacancy.title}"`,
+                link: `/applications/${application.id}`,
+            },
+        }).catch(() => null);
+        (0, response_1.ok)(res, { application }, 201);
     }
     catch (e) {
-        if (e?.code === 'P2002') {
-            (0, response_1.fail)(res, 'Вы уже откликались на эту вакансию');
-            return;
-        }
-        (0, response_1.fail)(res, `Server error: ${e instanceof Error ? e.message : 'unknown'}`);
+        (0, response_1.fail)(res, `Ошибка сервера: ${e instanceof Error ? e.message : 'unknown'}`);
     }
 }

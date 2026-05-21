@@ -6,5 +6,5 @@ const notification_controller_1 = require("../controllers/notification.controlle
 const router = (0, express_1.Router)();
 router.use(auth_middleware_1.authenticate);
 router.get('/', notification_controller_1.getNotifications);
-router.patch('/read', notification_controller_1.markAllRead);
+router.patch('/read', notification_controller_1.markNotificationsRead);
 exports.default = router;

@@ -47,6 +47,7 @@ async function getSkillTestQuestions(req, res) {
             (0, response_1.fail)(res, 'Тест не найден', 404);
             return;
         }
+        // Return questions without correctIndex (security)
         const questions = testData.questions.map(({ text, options }) => ({ text, options }));
         (0, response_1.ok)(res, {
             skill: testData.skill,

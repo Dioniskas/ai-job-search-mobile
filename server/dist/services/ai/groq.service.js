@@ -36,9 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.improveResume = improveResume;
 exports.generateResumeFromForm = generateResumeFromForm;
 exports.generateResumeFromTranscript = generateResumeFromTranscript;
-exports.generateVacancyDescription = generateVacancyDescription;
+exports.generateRejection = generateRejection;
 exports.generateInterviewQuestions = generateInterviewQuestions;
 exports.evaluateInterviewAnswer = evaluateInterviewAnswer;
+exports.generateVacancyDescription = generateVacancyDescription;
+exports.calculateMatchPercent = calculateMatchPercent;
+exports.keywordScore = keywordScore;
+exports.generateCoverLetter = generateCoverLetter;
+exports.estimateSalary = estimateSalary;
 exports.scoreResume = scoreResume;
 exports.transcribeAudio = transcribeAudio;
 const openai_1 = __importStar(require("openai"));
@@ -106,24 +111,23 @@ async function generateResumeFromForm(data) {
 async function generateResumeFromTranscript(transcript) {
     return chatJson(`Ниже — устный рассказ человека о своём профессиональном опыте. Составь по нему профессиональное резюме в стиле HH.ru:\n\n${transcript.slice(0, 4000)}`);
 }
-async function generateVacancyDescription(data) {
-    const parts = [
-        `Составь привлекательное описание вакансии для должности: ${data.title}.`,
-        data.requirements ? `Требования к кандидату: ${data.requirements}` : '',
-        data.conditions ? `Условия работы: ${data.conditions}` : '',
-        'Опиши подробно обязанности, требования и условия. Текст должен быть живым, профессиональным и мотивирующим. Верни только текст описания без заголовков и markdown.',
-    ].filter(Boolean).join('\n');
+async function generateRejection(data) {
     const resp = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: [
-            { role: 'system', content: 'Ты опытный HR-менеджер. Пишешь привлекательные описания вакансий на русском языке.' },
-            { role: 'user', content: parts },
+            {
+                role: 'system',
+                content: 'Ты — HR-менеджер. Пиши вежливые, тёплые и профессиональные письма об отказе на русском языке. Письмо должно быть коротким (3-4 предложения), уважительным и оставлять позитивное впечатление. Без лишних объяснений и извинений.',
+            },
+            {
+                role: 'user',
+                content: `Напиши вежливый отказ кандидату.\nКомпания: ${data.companyName}\nКандидат: ${data.seekerName}\nВакансия: ${data.vacancyTitle}\nВерни только текст сообщения, без приветствия "Уважаемый/ая" и подписи.`,
+            },
         ],
-        max_tokens: 800,
+        max_tokens: 300,
     });
-    return resp.choices[0].message.content ?? '';
+    return (resp.choices[0].message.content ?? '').trim();
 }
-// ── Interview prep ────────────────────────────────────────────────────────────
 async function generateInterviewQuestions(data) {
     const resp = await groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
@@ -189,6 +193,136 @@ async function evaluateInterviewAnswer(data) {
     }
     catch {
         return { feedback: 'Ответ принят.', score: 5, tips: [] };
+    }
+}
+// ── Vacancy description ────────────────────────────────────────────────────────
+async function generateVacancyDescription(data) {
+    const resp = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+            {
+                role: 'system',
+                content: 'Ты — опытный HR-менеджер. Напиши профессиональное описание вакансии на русском языке. Структурируй текст с разделами: **О компании**, **Задачи**, **Требования**, **Условия**. Текст должен быть конкретным, лаконичным и привлекательным для кандидатов. Без шаблонных вводных.',
+            },
+            {
+                role: 'user',
+                content: [
+                    `Вакансия: ${data.title}`,
+                    data.requirements ? `Требования: ${data.requirements}` : '',
+                    data.conditions ? `Условия: ${data.conditions}` : '',
+                ].filter(Boolean).join('\n'),
+            },
+        ],
+        max_tokens: 800,
+    });
+    return (resp.choices[0].message.content ?? '').trim();
+}
+async function calculateMatchPercent(data) {
+    const resp = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+        messages: [
+            {
+                role: 'system',
+                content: 'Ты — HR-аналитик. Оцени соответствие резюме вакансии. Верни JSON с полями: "percent" (целое число от 0 до 100), "explanation" (строка, 1–2 предложения на русском с конкретным объяснением оценки).',
+            },
+            {
+                role: 'user',
+                content: [
+                    `Резюме:`,
+                    `Должность: ${data.resumeTitle}`,
+                    `Навыки: ${data.resumeSkills.join(', ')}`,
+                    `Опыт: ${data.resumeExperience.slice(0, 800)}`,
+                    ``,
+                    `Вакансия:`,
+                    `Название: ${data.vacancyTitle}`,
+                    `Описание: ${data.vacancyDescription.slice(0, 800)}`,
+                ].join('\n'),
+            },
+        ],
+        max_tokens: 300,
+    });
+    try {
+        const parsed = JSON.parse(resp.choices[0].message.content ?? '{}');
+        return {
+            percent: typeof parsed.percent === 'number'
+                ? Math.max(0, Math.min(100, Math.round(parsed.percent)))
+                : 50,
+            explanation: parsed.explanation ?? '',
+        };
+    }
+    catch {
+        return { percent: 50, explanation: '' };
+    }
+}
+// ── Simple keyword score (no AI, for bulk operations) ─────────────────────────
+function keywordScore(resumeText, vacancyText) {
+    const normalize = (s) => s.toLowerCase().replace(/[^\wа-яёa-z0-9 ]/gi, ' ').split(/\s+/).filter((w) => w.length > 2);
+    const resumeSet = new Set(normalize(resumeText));
+    const vacancyWords = normalize(vacancyText);
+    if (resumeSet.size === 0 || vacancyWords.length === 0)
+        return 30;
+    const matches = vacancyWords.filter((w) => resumeSet.has(w)).length;
+    const raw = Math.round((matches / Math.max(vacancyWords.length, 1)) * 100);
+    return Math.min(90, Math.max(10, raw));
+}
+// ── Cover letter ───────────────────────────────────────────────────────────────
+async function generateCoverLetter(data) {
+    const resp = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+            {
+                role: 'system',
+                content: 'Ты — карьерный консультант. Напиши персонализированное сопроводительное письмо на русском языке. 3–4 абзаца: краткое введение, ключевые достижения/навыки, мотивация работать в компании, заключение. Конкретно, без клише.',
+            },
+            {
+                role: 'user',
+                content: [
+                    `Кандидат: ${data.seekerName}`,
+                    `Желаемая должность: ${data.resumeTitle}`,
+                    `Навыки: ${data.resumeSkills.slice(0, 10).join(', ')}`,
+                    data.resumeSummary ? `О себе: ${data.resumeSummary.slice(0, 400)}` : '',
+                    ``,
+                    `Вакансия: ${data.vacancyTitle}`,
+                    `Компания: ${data.companyName}`,
+                ].filter(Boolean).join('\n'),
+            },
+        ],
+        max_tokens: 600,
+    });
+    return (resp.choices[0].message.content ?? '').trim();
+}
+async function estimateSalary(data) {
+    const resp = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        response_format: { type: 'json_object' },
+        messages: [
+            {
+                role: 'system',
+                content: 'Ты — эксперт по рынку труда в Узбекистане (Ташкент). Оцени рыночную зарплату специалиста. Верни JSON: "min" (число, в сумах), "max" (число, в сумах), "currency" ("UZS"), "explanation" (строка, 1–2 предложения). Суммы реалистичные для рынка Ташкента 2024–2025.',
+            },
+            {
+                role: 'user',
+                content: [
+                    `Должность: ${data.title}`,
+                    `Навыки: ${data.skills.slice(0, 10).join(', ')}`,
+                    `Опыт: ${data.experience.slice(0, 500)}`,
+                ].join('\n'),
+            },
+        ],
+        max_tokens: 300,
+    });
+    try {
+        const parsed = JSON.parse(resp.choices[0].message.content ?? '{}');
+        return {
+            min: typeof parsed.min === 'number' ? parsed.min : 3000000,
+            max: typeof parsed.max === 'number' ? parsed.max : 8000000,
+            currency: 'UZS',
+            explanation: parsed.explanation ?? '',
+        };
+    }
+    catch {
+        return { min: 3000000, max: 8000000, currency: 'UZS', explanation: '' };
     }
 }
 async function scoreResume(content) {

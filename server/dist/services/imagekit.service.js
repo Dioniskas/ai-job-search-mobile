@@ -1,19 +1,15 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadBuffer = uploadBuffer;
 exports.deleteFile = deleteFile;
-const imagekit_1 = __importDefault(require("imagekit"));
-const ik = new imagekit_1.default({
-    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+const nodejs_1 = require("@imagekit/nodejs");
+const ik = new nodejs_1.ImageKit({
     privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-    urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
 });
 async function uploadBuffer(buffer, mimetype, folder, fileName) {
-    const result = await ik.upload({
-        file: buffer,
+    const file = await (0, nodejs_1.toFile)(buffer, fileName, { type: mimetype });
+    const result = await ik.files.upload({
+        file,
         fileName,
         folder,
         useUniqueFileName: false,
@@ -23,6 +19,8 @@ async function uploadBuffer(buffer, mimetype, folder, fileName) {
         throw new Error('ImageKit upload returned no URL');
     return result.url;
 }
+// Requires fileId — store it in the future if soft-delete is needed.
+// Currently unused; left for future sprints.
 async function deleteFile(fileId) {
-    await ik.deleteFile(fileId);
+    await ik.files.delete(fileId);
 }

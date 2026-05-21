@@ -45,7 +45,7 @@ export async function register(req: Request, res: Response): Promise<void> {
     data: { email, password: hashed, role },
   });
 
-  const token = signToken({ userId: user.id, email: user.email, role: user.role });
+  const token = signToken({ userId: user.id, email: user.email, role: user.role as 'SEEKER' | 'EMPLOYER' });
   ok(res, { token, user: { id: user.id, email: user.email, role: user.role } }, 201);
 }
 
@@ -63,7 +63,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const token = signToken({ userId: user.id, email: user.email, role: user.role });
+  const token = signToken({ userId: user.id, email: user.email, role: user.role as 'SEEKER' | 'EMPLOYER' });
   ok(res, { token, user: { id: user.id, email: user.email, role: user.role } });
 }
 
