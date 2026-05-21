@@ -17,7 +17,7 @@ import {
 } from '../services/ai/groq.service';
 
 // ── Font discovery for Cyrillic support ───────────────────────────────────────
-const DEJAVU_LOCAL = nodePath.join(process.cwd(), 'fonts', 'DejaVuSans.ttf');
+const DEJAVU_LOCAL = nodePath.join(__dirname, '../../fonts/DejaVuSans.ttf');
 
 function findCyrillicFont(): string | undefined {
   const candidates = [
